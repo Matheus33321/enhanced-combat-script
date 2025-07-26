@@ -18,62 +18,13 @@ local EnhancedSettings = {
     SpeedLevel = 0,         -- 0=Normal, 1=Fast, 2=Sonic, 3=Flash
     StaminaMode = 0,        -- 0=Normal, 1=Extended, 2=Infinite
     StunResistance = 0,     -- 0=Normal, 1=Reduced, 2=Immune
-    CriticalLevel = 0,      -- 0=Normal, 1=Lucky, 2=Critical, 3=Destroyer
-    ComboSpeed = 0,         -- 0=Normal, 1=Fast, 2=Rapid, 3=Lightning
     AutoFeatures = 0,       -- 0=Off, 1=Attack, 2=Block, 3=Both
-    RangeBoost = 0,         -- 0=Normal, 1=Long, 2=Extended, 3=Massive
-    KnockbackPower = 0      -- 0=Normal, 1=Strong, 2=Powerful, 3=Devastating
 }
 
--- Configuration levels
-local ConfigLevels = {
-    Cooldown = {
-        [0] = 1.0,    -- Normal
-        [1] = 0.3,    -- 70% faster
-        [2] = 0.1,    -- 90% faster  
-        [3] = 0.01    -- Instant (99% faster)
-    },
-    Hitbox = {
-        [0] = 1.0,    -- Normal range
-        [1] = 2.0,    -- 100% larger
-        [2] = 3.5,    -- 250% larger
-        [3] = 5.0     -- 400% larger
-    },
-    Damage = {
-        [0] = 1.0,    -- Normal damage
-        [1] = 1.75,   -- 75% more
-        [2] = 2.5,    -- 150% more
-        [3] = 4.0     -- 300% more
-    },
-    Speed = {
-        [0] = 16,     -- Normal speed
-        [1] = 28,     -- Fast
-        [2] = 40,     -- Sonic
-        [3] = 60      -- Flash
-    },
-    Critical = {
-        [0] = {chance = 5, multiplier = 2},      -- Normal
-        [1] = {chance = 25, multiplier = 2.5},   -- Lucky
-        [2] = {chance = 50, multiplier = 4},     -- Critical
-        [3] = {chance = 85, multiplier = 6}      -- Destroyer
-    },
-    Range = {
-        [0] = 1.0,    -- Normal
-        [1] = 2.0,    -- Long
-        [2] = 3.0,    -- Extended
-        [3] = 5.0     -- Massive
-    },
-    Knockback = {
-        [0] = 1.0,    -- Normal
-        [1] = 1.5,    -- Strong
-        [2] = 2.2,    -- Powerful
-        [3] = 3.5     -- Devastating
-    }
-}
-
--- Backup and enhanced folders
-local OriginalValues = {}
+-- Backup and connections
 local connections = {}
+local attackSpamming = false
+local autoBlocking = false
 
 -- Utility Functions
 local function safeCall(func, ...)
@@ -95,82 +46,112 @@ local function waitForChild(parent, childName, timeout)
     return parent:FindFirstChild(childName)
 end
 
--- Backup original values
-local function backupOriginalValues()
-    safeCall(function()
-        local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
-        if not config then return end
+-- NOVA ABORDAGEM: Spam de ataques para simular cooldown reduzido
+local function handleCooldownBypass()
+    if EnhancedSettings.CooldownLevel == 0 then
+        attackSpamming = false
+        return
+    end
+    
+    local spamRates = {
+        [1] = 0.3,  -- Fast
+        [2] = 0.15, -- Ultra  
+        [3] = 0.05  -- Instant
+    }
+    
+    attackSpamming = true
+    
+    if connections.cooldownSpam then
+        connections.cooldownSpam:Disconnect()
+    end
+    
+    connections.cooldownSpam = task.spawn(function()
+        while attackSpamming and EnhancedSettings.CooldownLevel > 0 do
+            local events = ReplicatedStorage:FindFirstChild("Events")
+            if events then
+                local doAttack = events:FindFirstChild("DoAttack")
+                if doAttack and player.Character then
+                    local humanoid = player.Character:FindFirstChild("Humanoid")
+                    local combatState = humanoid and humanoid:FindFirstChild("CombatState")
+                    
+                    if combatState then
+                        local attacking = combatState:FindFirstChild("Attacking")
+                        local stunned = combatState:FindFirstChild("Stunned")
+                        
+                        -- Só ataca se não estiver atacando e não estiver stunned
+                        if attacking and stunned and not attacking.Value and not stunned.Value then
+                            -- Verifica se há inimigos próximos
+                            local hasNearbyEnemies = false
+                            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+                            
+                            if rootPart then
+                                for _, otherPlayer in pairs(Players:GetPlayers()) do
+                                    if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                                        local distance = (rootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
+                                        if distance < 15 then
+                                            hasNearbyEnemies = true
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if hasNearbyEnemies then
+                                doAttack:FireServer()
+                            end
+                        end
+                    end
+                end
+            end
+            
+            task.wait(spamRates[EnhancedSettings.CooldownLevel] or 0.3)
+        end
+    end)
+end
 
-        OriginalValues.AttackCooldowns = {}
-        OriginalValues.AttackRanges = {}
-        OriginalValues.ComboDamage = {}
-        OriginalValues.ComboKnockback = {}
-        OriginalValues.DashValues = {}
-        
-        local attacking = config:FindFirstChild("Attacking")
-        if attacking then
-            local cooldowns = attacking:FindFirstChild("Cooldowns")
-            if cooldowns then
-                for i = 1, 10 do
-                    local cooldown = cooldowns:FindFirstChild(tostring(i))
-                    if cooldown then
-                        OriginalValues.AttackCooldowns[i] = cooldown.Value
-                    end
-                end
-            end
+-- NOVA ABORDAGEM: Modificar hitbox expandindo o tamanho do personagem temporariamente
+local function handleHitboxExpansion()
+    if not player.Character or EnhancedSettings.HitboxLevel == 0 then
+        return
+    end
+    
+    local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local multipliers = {
+        [1] = 1.5,  -- Extended
+        [2] = 2.0,  -- Wide
+        [3] = 3.0   -- Massive
+    }
+    
+    local multiplier = multipliers[EnhancedSettings.HitboxLevel]
+    if not multiplier then return end
+    
+    if connections.hitboxExpansion then
+        connections.hitboxExpansion:Disconnect()
+    end
+    
+    connections.hitboxExpansion = RunService.Heartbeat:Connect(function()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            local humanoid = player.Character.Humanoid
+            local combatState = humanoid:FindFirstChild("CombatState")
             
-            local ranges = attacking:FindFirstChild("Ranges")
-            if ranges then
-                for i = 1, 10 do
-                    local range = ranges:FindFirstChild(tostring(i))
-                    if range then
-                        OriginalValues.AttackRanges[i] = range.Value
-                    end
-                end
-            end
-            
-            local dash = attacking:FindFirstChild("Dash")
-            if dash then
-                for i = 1, 10 do
-                    local dashValue = dash:FindFirstChild(tostring(i))
-                    if dashValue then
-                        OriginalValues.DashValues[i] = dashValue.Value
-                    end
-                end
-            end
-        end
-        
-        local damage = config:FindFirstChild("Damage")
-        if damage then
-            local comboDamage = damage:FindFirstChild("ComboDamage")
-            if comboDamage then
-                for i = 1, 10 do
-                    local dmg = comboDamage:FindFirstChild(tostring(i))
-                    if dmg then
-                        OriginalValues.ComboDamage[i] = dmg.Value
-                    end
-                end
-            end
-            
-            local critChance = damage:FindFirstChild("CriticalHitChance")
-            if critChance then
-                OriginalValues.CritChance = critChance.Value
-            end
-            
-            local critMultiplier = damage:FindFirstChild("CriticalHitMultiplier")
-            if critMultiplier then
-                OriginalValues.CritMultiplier = critMultiplier.Value
-            end
-        end
-        
-        local knockback = config:FindFirstChild("Knockback")
-        if knockback then
-            local comboKnockback = knockback:FindFirstChild("ComboKnockback")
-            if comboKnockback then
-                for i = 1, 10 do
-                    local kb = comboKnockback:FindFirstChild(tostring(i))
-                    if kb then
-                        OriginalValues.ComboKnockback[i] = kb.Value
+            if combatState then
+                local attacking = combatState:FindFirstChild("Attacking")
+                
+                if attacking and attacking.Value then
+                    -- Expandir hitbox durante ataque
+                    local originalSize = rootPart.Size
+                    rootPart.Size = Vector3.new(
+                        originalSize.X * multiplier,
+                        originalSize.Y,
+                        originalSize.Z * multiplier
+                    )
+                    
+                    -- Restaurar tamanho após um frame
+                    task.wait()
+                    if rootPart and rootPart.Parent then
+                        rootPart.Size = originalSize
                     end
                 end
             end
@@ -178,112 +159,7 @@ local function backupOriginalValues()
     end)
 end
 
--- Apply enhanced configurations 
-local function applyEnhancements()
-    safeCall(function()
-        local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
-        if not config then return end
-
-        local attacking = config:FindFirstChild("Attacking")
-        if attacking then
-            -- Apply cooldown modifications
-            local cooldowns = attacking:FindFirstChild("Cooldowns")
-            if cooldowns then
-                local multiplier = ConfigLevels.Cooldown[EnhancedSettings.CooldownLevel]
-                for i = 1, 10 do
-                    local cooldown = cooldowns:FindFirstChild(tostring(i))
-                    if cooldown and OriginalValues.AttackCooldowns[i] then
-                        cooldown.Value = math.max(0.01, OriginalValues.AttackCooldowns[i] * multiplier)
-                    end
-                end
-            end
-            
-            -- Apply range modifications
-            local ranges = attacking:FindFirstChild("Ranges")
-            if ranges then
-                local multiplier = ConfigLevels.Range[EnhancedSettings.RangeBoost]
-                for i = 1, 10 do
-                    local range = ranges:FindFirstChild(tostring(i))
-                    if range and OriginalValues.AttackRanges[i] then
-                        range.Value = OriginalValues.AttackRanges[i] * multiplier
-                    end
-                end
-            end
-            
-            -- Apply dash modifications
-            local dash = attacking:FindFirstChild("Dash")
-            if dash then
-                local multiplier = ConfigLevels.Knockback[EnhancedSettings.KnockbackPower]
-                for i = 1, 10 do
-                    local dashValue = dash:FindFirstChild(tostring(i))
-                    if dashValue and OriginalValues.DashValues[i] then
-                        dashValue.Value = OriginalValues.DashValues[i] * multiplier
-                    end
-                end
-            end
-        end
-        
-        -- Apply damage modifications
-        local damage = config:FindFirstChild("Damage")
-        if damage then
-            local comboDamage = damage:FindFirstChild("ComboDamage")
-            if comboDamage then
-                local multiplier = ConfigLevels.Damage[EnhancedSettings.DamageLevel]
-                for i = 1, 10 do
-                    local dmg = comboDamage:FindFirstChild(tostring(i))
-                    if dmg and OriginalValues.ComboDamage[i] then
-                        dmg.Value = OriginalValues.ComboDamage[i] * multiplier
-                    end
-                end
-            end
-            
-            -- Apply critical hit modifications
-            local critConfig = ConfigLevels.Critical[EnhancedSettings.CriticalLevel]
-            local critChance = damage:FindFirstChild("CriticalHitChance")
-            if critChance then
-                critChance.Value = critConfig.chance
-            end
-            
-            local critMultiplier = damage:FindFirstChild("CriticalHitMultiplier")
-            if critMultiplier then
-                critMultiplier.Value = critConfig.multiplier
-            end
-        end
-        
-        -- Apply knockback modifications
-        local knockback = config:FindFirstChild("Knockback")
-        if knockback then
-            local comboKnockback = knockback:FindFirstChild("ComboKnockback")
-            if comboKnockback then
-                local multiplier = ConfigLevels.Knockback[EnhancedSettings.KnockbackPower]
-                for i = 1, 10 do
-                    local kb = comboKnockback:FindFirstChild(tostring(i))
-                    if kb and OriginalValues.ComboKnockback[i] then
-                        kb.Value = OriginalValues.ComboKnockback[i] * multiplier
-                    end
-                end
-            end
-        end
-        
-        -- Apply blocking enhancements
-        local blocking = config:FindFirstChild("Blocking")
-        if blocking then
-            if EnhancedSettings.BlockingMode == 1 then
-                local damageAbsorption = blocking:FindFirstChild("DamageAbsorption")
-                if damageAbsorption then
-                    damageAbsorption.Value = 0.85
-                end
-            elseif EnhancedSettings.BlockingMode >= 2 then
-                local damageAbsorption = blocking:FindFirstChild("DamageAbsorption")
-                if damageAbsorption then
-                    damageAbsorption.Value = 0.95
-                end
-            end
-        end
-    end)
-end
-
--- Character enhancements (NOVA ABORDAGEM)
+-- Character enhancements
 local function enhanceCharacter(character)
     if not character then return end
     
@@ -297,7 +173,9 @@ local function enhanceCharacter(character)
         
         -- Speed enhancement
         if EnhancedSettings.SpeedLevel > 0 then
-            local targetSpeed = ConfigLevels.Speed[EnhancedSettings.SpeedLevel]
+            local speeds = {[1] = 28, [2] = 40, [3] = 60}
+            local targetSpeed = speeds[EnhancedSettings.SpeedLevel] or 16
+            
             humanoid.WalkSpeed = targetSpeed
             
             if connections.speedConnection then
@@ -312,33 +190,6 @@ local function enhanceCharacter(character)
         end
 
         if combatState then
-            -- NOVA ABORDAGEM: Manipular AttackCooldown diretamente
-            if EnhancedSettings.CooldownLevel > 0 then
-                if connections.cooldownConnection then
-                    connections.cooldownConnection:Disconnect()
-                end
-                
-                connections.cooldownConnection = combatState.AttackCooldown:GetPropertyChangedSignal("Value"):Connect(function()
-                    if EnhancedSettings.CooldownLevel > 0 and combatState.AttackCooldown.Value == true then
-                        local cooldownMultiplier = ConfigLevels.Cooldown[EnhancedSettings.CooldownLevel]
-                        task.spawn(function()
-                            if EnhancedSettings.CooldownLevel == 3 then
-                                -- Instant mode
-                                task.wait(0.01)
-                            else
-                                -- Calculate based on original cooldown
-                                local originalCooldown = 0.5 -- Default cooldown estimate
-                                task.wait(originalCooldown * cooldownMultiplier)
-                            end
-                            
-                            if combatState.AttackCooldown.Value == true then
-                                combatState.AttackCooldown.Value = false
-                            end
-                        end)
-                    end
-                end)
-            end
-            
             -- Stamina management
             local stamina = combatState:FindFirstChild("Stamina")
             if stamina then
@@ -348,24 +199,21 @@ local function enhanceCharacter(character)
                 
                 if EnhancedSettings.StaminaMode == 1 then
                     -- Extended stamina
-                    stamina.Value = math.max(stamina.Value, 800)
                     connections.staminaConnection = stamina:GetPropertyChangedSignal("Value"):Connect(function()
-                        if EnhancedSettings.StaminaMode == 1 and stamina.Value < 500 then
+                        if stamina.Value < 500 then
                             stamina.Value = 800
                         end
                     end)
                 elseif EnhancedSettings.StaminaMode == 2 then
                     -- Infinite stamina
-                    stamina.Value = 99999
                     connections.staminaConnection = stamina:GetPropertyChangedSignal("Value"):Connect(function()
-                        if EnhancedSettings.StaminaMode == 2 and stamina.Value < 99999 then
-                            stamina.Value = 99999
-                        end
+                        stamina.Value = 99999
                     end)
+                    stamina.Value = 99999
                 end
             end
 
-            -- Stun resistance
+            -- Stun resistance (FORÇAR VALOR DIRETAMENTE)
             local stunned = combatState:FindFirstChild("Stunned")
             if stunned then
                 if connections.stunConnection then
@@ -377,41 +225,16 @@ local function enhanceCharacter(character)
                     connections.stunConnection = stunned:GetPropertyChangedSignal("Value"):Connect(function()
                         if stunned.Value then
                             task.spawn(function()
-                                task.wait(0.05) -- Very short stun
-                                if stunned and stunned.Parent then
-                                    stunned.Value = false
-                                end
+                                task.wait(0.1)
+                                stunned.Value = false
                             end)
                         end
                     end)
                 elseif EnhancedSettings.StunResistance == 2 then
-                    -- Complete immunity
-                    stunned.Value = false
-                    connections.stunConnection = stunned:GetPropertyChangedSignal("Value"):Connect(function()
-                        if EnhancedSettings.StunResistance == 2 and stunned.Value then
+                    -- Complete immunity - força valor constantemente
+                    connections.stunConnection = RunService.Heartbeat:Connect(function()
+                        if stunned.Value then
                             stunned.Value = false
-                        end
-                    end)
-                end
-            end
-
-            -- Fast combo system
-            if EnhancedSettings.ComboSpeed > 0 then
-                local lastAttacked = combatState:FindFirstChild("LastAttacked")
-                if lastAttacked then
-                    if connections.comboConnection then
-                        connections.comboConnection:Disconnect()
-                    end
-                    
-                    connections.comboConnection = lastAttacked:GetPropertyChangedSignal("Value"):Connect(function()
-                        if EnhancedSettings.ComboSpeed > 0 then
-                            task.spawn(function()
-                                task.wait(0.01)
-                                local resetTimes = {[1] = 3, [2] = 1, [3] = 0.1}
-                                if lastAttacked and lastAttacked.Parent then
-                                    lastAttacked.Value = tick() - resetTimes[EnhancedSettings.ComboSpeed]
-                                end
-                            end)
                         end
                     end)
                 end
@@ -424,7 +247,7 @@ local function enhanceCharacter(character)
                 end
                 
                 connections.autoConnection = RunService.Heartbeat:Connect(function()
-                    if not character.Parent or humanoid.Health <= 0 or EnhancedSettings.AutoFeatures == 0 then
+                    if not character.Parent or humanoid.Health <= 0 then
                         return
                     end
                     
@@ -436,7 +259,7 @@ local function enhanceCharacter(character)
                         for _, otherPlayer in pairs(Players:GetPlayers()) do
                             if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
                                 local distance = (rootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
-                                if distance < 20 and distance < nearestDistance then
+                                if distance < 18 and distance < nearestDistance then
                                     nearestDistance = distance
                                     nearestTarget = otherPlayer.Character
                                 end
@@ -446,8 +269,11 @@ local function enhanceCharacter(character)
                         if nearestTarget then
                             local attacking = combatState:FindFirstChild("Attacking")
                             local attackCooldown = combatState:FindFirstChild("AttackCooldown")
+                            local stunnedValue = combatState:FindFirstChild("Stunned")
                             
-                            if attacking and attackCooldown and not attacking.Value and not attackCooldown.Value then
+                            if attacking and attackCooldown and stunnedValue and 
+                               not attacking.Value and not attackCooldown.Value and not stunnedValue.Value then
+                                
                                 -- Face target
                                 local targetDirection = (nearestTarget.HumanoidRootPart.Position - rootPart.Position).Unit
                                 rootPart.CFrame = CFrame.lookAt(rootPart.Position, rootPart.Position + Vector3.new(targetDirection.X, 0, targetDirection.Z))
@@ -469,7 +295,6 @@ local function enhanceCharacter(character)
                        EnhancedSettings.BlockingMode >= 2 then
                         
                         local shouldBlock = false
-                        local blockRange = 20
                         
                         for _, otherPlayer in pairs(Players:GetPlayers()) do
                             if otherPlayer ~= player and otherPlayer.Character then
@@ -482,7 +307,7 @@ local function enhanceCharacter(character)
                                         local otherAttacking = otherCombatState:FindFirstChild("Attacking")
                                         if otherAttacking and otherAttacking.Value then
                                             local distance = (rootPart.Position - otherRoot.Position).Magnitude
-                                            if distance < blockRange then
+                                            if distance < 20 then
                                                 shouldBlock = true
                                                 break
                                             end
@@ -505,11 +330,15 @@ local function enhanceCharacter(character)
                     end
                 end)
             end
+            
+            -- Aplicar sistemas especiais
+            handleCooldownBypass()
+            handleHitboxExpansion()
         end
     end)
 end
 
--- Create Advanced GUI (mesmo código anterior)
+-- Create Advanced GUI
 local function createAdvancedGUI()
     safeCall(function()
         local existingGUI = playerGui:FindFirstChild("EnhancedCombatGUI")
@@ -524,9 +353,9 @@ local function createAdvancedGUI()
 
         local mainFrame = Instance.new("Frame")
         mainFrame.Name = "MainFrame"
-        mainFrame.Size = UDim2.new(0, 400, 0, 500)
-        mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-        mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+        mainFrame.Size = UDim2.new(0, 380, 0, 450)
+        mainFrame.Position = UDim2.new(0.5, -190, 0.5, -225)
+        mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
         mainFrame.BorderSizePixel = 0
         mainFrame.Parent = screenGui
 
@@ -556,24 +385,24 @@ local function createAdvancedGUI()
         end)
 
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 12)
+        corner.CornerRadius = UDim.new(0, 15)
         corner.Parent = mainFrame
 
         local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0, 255, 127)
+        stroke.Color = Color3.fromRGB(255, 100, 100)
         stroke.Thickness = 2
         stroke.Parent = mainFrame
 
         local headerFrame = Instance.new("Frame")
         headerFrame.Name = "HeaderFrame"
-        headerFrame.Size = UDim2.new(1, 0, 0, 80)
+        headerFrame.Size = UDim2.new(1, 0, 0, 70)
         headerFrame.Position = UDim2.new(0, 0, 0, 0)
-        headerFrame.BackgroundColor3 = Color3.fromRGB(0, 255, 127)
+        headerFrame.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
         headerFrame.BorderSizePixel = 0
         headerFrame.Parent = mainFrame
 
         local headerCorner = Instance.new("UICorner")
-        headerCorner.CornerRadius = UDim.new(0, 12)
+        headerCorner.CornerRadius = UDim.new(0, 15)
         headerCorner.Parent = headerFrame
 
         local titleLabel = Instance.new("TextLabel")
@@ -581,8 +410,8 @@ local function createAdvancedGUI()
         titleLabel.Size = UDim2.new(1, -60, 1, 0)
         titleLabel.Position = UDim2.new(0, 15, 0, 0)
         titleLabel.BackgroundTransparency = 1
-        titleLabel.Text = "Enhanced Combat System v2.0"
-        titleLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+        titleLabel.Text = "DIRECT COMBAT BYPASS"
+        titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
         titleLabel.TextScaled = true
         titleLabel.Font = Enum.Font.GothamBold
         titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -590,54 +419,65 @@ local function createAdvancedGUI()
 
         local closeButton = Instance.new("TextButton")
         closeButton.Name = "CloseButton"
-        closeButton.Size = UDim2.new(0, 50, 0, 50)
-        closeButton.Position = UDim2.new(1, -60, 0, 15)
+        closeButton.Size = UDim2.new(0, 45, 0, 45)
+        closeButton.Position = UDim2.new(1, -55, 0, 12)
         closeButton.BackgroundTransparency = 1
         closeButton.Text = "✖"
-        closeButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+        closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
         closeButton.TextScaled = true
         closeButton.Font = Enum.Font.GothamBold
         closeButton.Parent = headerFrame
 
         local settingsContainer = Instance.new("ScrollingFrame")
         settingsContainer.Name = "SettingsContainer"
-        settingsContainer.Size = UDim2.new(1, -20, 1, -100)
-        settingsContainer.Position = UDim2.new(0, 10, 0, 90)
+        settingsContainer.Size = UDim2.new(1, -20, 1, -90)
+        settingsContainer.Position = UDim2.new(0, 10, 0, 80)
         settingsContainer.BackgroundTransparency = 1
-        settingsContainer.ScrollBarThickness = 8
-        settingsContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 127)
-        settingsContainer.CanvasSize = UDim2.new(0, 0, 0, 900)
+        settingsContainer.ScrollBarThickness = 6
+        settingsContainer.ScrollBarImageColor3 = Color3.fromRGB(255, 100, 100)
+        settingsContainer.CanvasSize = UDim2.new(0, 0, 0, 600)
         settingsContainer.Parent = mainFrame
 
         local layout = Instance.new("UIListLayout")
-        layout.Padding = UDim.new(0, 10)
+        layout.Padding = UDim.new(0, 12)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Parent = settingsContainer
 
-        local function createSettingControl(name, settingKey, options)
+        local function createSettingControl(name, settingKey, options, description)
             local settingFrame = Instance.new("Frame")
-            settingFrame.Size = UDim2.new(1, 0, 0, 60)
+            settingFrame.Size = UDim2.new(1, 0, 0, 65)
             settingFrame.BackgroundTransparency = 1
             settingFrame.LayoutOrder = #settingsContainer:GetChildren()
             settingFrame.Parent = settingsContainer
 
             local label = Instance.new("TextLabel")
-            label.Size = UDim2.new(0.4, 0, 1, 0)
+            label.Size = UDim2.new(0.35, 0, 0.6, 0)
             label.BackgroundTransparency = 1
             label.Text = name
             label.TextColor3 = Color3.fromRGB(255, 255, 255)
             label.TextScaled = true
-            label.Font = Enum.Font.Gotham
+            label.Font = Enum.Font.GothamBold
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Parent = settingFrame
 
+            local descLabel = Instance.new("TextLabel")
+            descLabel.Size = UDim2.new(0.35, 0, 0.4, 0)
+            descLabel.Position = UDim2.new(0, 0, 0.6, 0)
+            descLabel.BackgroundTransparency = 1
+            descLabel.Text = description
+            descLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            descLabel.TextScaled = true
+            descLabel.Font = Enum.Font.Gotham
+            descLabel.TextXAlignment = Enum.TextXAlignment.Left
+            descLabel.Parent = settingFrame
+
             local valueButton = Instance.new("TextButton")
-            valueButton.Size = UDim2.new(0.55, 0, 0.8, 0)
-            valueButton.Position = UDim2.new(0.45, 0, 0.1, 0)
-            valueButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-            valueButton.TextColor3 = Color3.fromRGB(0, 255, 127)
+            valueButton.Size = UDim2.new(0.6, 0, 0.75, 0)
+            valueButton.Position = UDim2.new(0.38, 0, 0.125, 0)
+            valueButton.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+            valueButton.TextColor3 = Color3.fromRGB(255, 100, 100)
             valueButton.TextScaled = true
-            valueButton.Font = Enum.Font.Gotham
+            valueButton.Font = Enum.Font.GothamBold
             valueButton.Text = options[EnhancedSettings[settingKey] + 1]
             valueButton.Parent = settingFrame
 
@@ -646,7 +486,7 @@ local function createAdvancedGUI()
             buttonCorner.Parent = valueButton
 
             local buttonStroke = Instance.new("UIStroke")
-            buttonStroke.Color = Color3.fromRGB(0, 255, 127)
+            buttonStroke.Color = Color3.fromRGB(255, 100, 100)
             buttonStroke.Thickness = 1
             buttonStroke.Parent = valueButton
 
@@ -655,31 +495,30 @@ local function createAdvancedGUI()
                 local nextValue = (currentValue + 1) % #options
                 EnhancedSettings[settingKey] = nextValue
                 valueButton.Text = options[nextValue + 1]
-                applyEnhancements()
-                enhanceCharacter(player.Character)
+                
+                -- Reapply enhancements
+                if player.Character then
+                    enhanceCharacter(player.Character)
+                end
             end)
 
             return settingFrame
         end
 
-        local settingOptions = {
-            CooldownLevel = {"Normal", "Fast", "Ultra", "Instant"},
-            HitboxLevel = {"Normal", "Extended", "Wide", "Massive"},
-            BlockingMode = {"Normal", "Enhanced", "Auto", "Perfect"},
-            DamageLevel = {"Normal", "Boosted", "High", "Extreme"},
-            SpeedLevel = {"Normal", "Fast", "Sonic", "Flash"},
-            StaminaMode = {"Normal", "Extended", "Infinite"},
-            StunResistance = {"Normal", "Reduced", "Immune"},
-            CriticalLevel = {"Normal", "Lucky", "Critical", "Destroyer"},
-            ComboSpeed = {"Normal", "Fast", "Rapid", "Lightning"},
-            AutoFeatures = {"Off", "Attack", "Block", "Both"},
-            RangeBoost = {"Normal", "Long", "Extended", "Massive"},
-            KnockbackPower = {"Normal", "Strong", "Powerful", "Devastating"}
-        }
-
-        for settingName, options in pairs(settingOptions) do
-            createSettingControl(settingName:gsub("([A-Z])", " %1"):gsub("^%s", ""), settingName, options)
-        end
+        -- Create simplified settings
+        createSettingControl("COOLDOWN BYPASS", "CooldownLevel", {"Normal", "Fast", "Ultra", "Instant"}, "Spam attacks to bypass cooldown")
+        
+        createSettingControl("HITBOX EXPANSION", "HitboxLevel", {"Normal", "Extended", "Wide", "Massive"}, "Expand character size during attacks")
+        
+        createSettingControl("BLOCKING MODE", "BlockingMode", {"Normal", "Enhanced", "Auto", "Perfect"}, "Automatic blocking system")
+        
+        createSettingControl("SPEED BOOST", "SpeedLevel", {"Normal", "Fast", "Sonic", "Flash"}, "Character movement speed")
+        
+        createSettingControl("STAMINA MODE", "StaminaMode", {"Normal", "Extended", "Infinite"}, "Stamina management")
+        
+        createSettingControl("STUN RESISTANCE", "StunResistance", {"Normal", "Reduced", "Immune"}, "Stun duration control")
+        
+        createSettingControl("AUTO FEATURES", "AutoFeatures", {"Off", "Attack", "Block", "Both"}, "Automated combat actions")
 
         -- Toggle GUI visibility
         local isVisible = true
@@ -702,92 +541,31 @@ end
 -- Cleanup function
 local function cleanup()
     safeCall(function()
+        -- Stop attack spamming
+        attackSpamming = false
+        
         -- Disconnect all connections
         for _, connection in pairs(connections) do
             if connection then
-                connection:Disconnect()
+                if typeof(connection) == "RBXScriptConnection" then
+                    connection:Disconnect()
+                elseif typeof(connection) == "thread" then
+                    task.cancel(connection)
+                end
             end
         end
         connections = {}
-
-        -- Restore original values
-        local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
-        if config then
-            local attacking = config:FindFirstChild("Attacking")
-            if attacking then
-                local cooldowns = attacking:FindFirstChild("Cooldowns")
-                if cooldowns then
-                    for i = 1, 10 do
-                        local cooldown = cooldowns:FindFirstChild(tostring(i))
-                        if cooldown and OriginalValues.AttackCooldowns[i] then
-                            cooldown.Value = OriginalValues.AttackCooldowns[i]
-                        end
-                    end
-                end
-                
-                local ranges = attacking:FindFirstChild("Ranges")
-                if ranges then
-                    for i = 1, 10 do
-                        local range = ranges:FindFirstChild(tostring(i))
-                        if range and OriginalValues.AttackRanges[i] then
-                            range.Value = OriginalValues.AttackRanges[i]
-                        end
-                    end
-                end
-                
-                local dash = attacking:FindFirstChild("Dash")
-                if dash then
-                    for i = 1, 10 do
-                        local dashValue = dash:FindFirstChild(tostring(i))
-                        if dashValue and OriginalValues.DashValues[i] then
-                            dashValue.Value = OriginalValues.DashValues[i]
-                        end
-                    end
-                end
-            end
-            
-            local damage = config:FindFirstChild("Damage")
-            if damage then
-                local comboDamage = damage:FindFirstChild("ComboDamage")
-                if comboDamage then
-                    for i = 1, 10 do
-                        local dmg = comboDamage:FindFirstChild(tostring(i))
-                        if dmg and OriginalValues.ComboDamage[i] then
-                            dmg.Value = OriginalValues.ComboDamage[i]
-                        end
-                    end
-                end
-                
-                local critChance = damage:FindFirstChild("CriticalHitChance")
-                if critChance and OriginalValues.CritChance then
-                    critChance.Value = OriginalValues.CritChance
-                end
-                
-                local critMultiplier = damage:FindFirstChild("CriticalHitMultiplier")
-                if critMultiplier and OriginalValues.CritMultiplier then
-                    critMultiplier.Value = OriginalValues.CritMultiplier
-                end
-            end
-            
-            local knockback = config:FindFirstChild("Knockback")
-            if knockback then
-                local comboKnockback = knockback:FindFirstChild("ComboKnockback")
-                if comboKnockback then
-                    for i = 1, 10 do
-                        local kb = comboKnockback:FindFirstChild(tostring(i))
-                        if kb and OriginalValues.ComboKnockback[i] then
-                            kb.Value = OriginalValues.ComboKnockback[i]
-                        end
-                    end
-                end
-            end
-        end
 
         -- Reset character properties
         if player.Character then
             local humanoid = player.Character:FindFirstChild("Humanoid")
             if humanoid then
                 humanoid.WalkSpeed = 16
+            end
+            
+            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                rootPart.Size = Vector3.new(2, 5, 1) -- Reset to default size
             end
         end
 
@@ -820,38 +598,18 @@ if player.Character then
     onCharacterAdded(player.Character)
 end
 
--- Monitor for configuration changes with continuous updates
-connections.configMonitor = RunService.Heartbeat:Connect(function()
-    local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
-    if config then
-        if next(OriginalValues) == nil then
-            backupOriginalValues()
-        end
-        -- Continuously apply enhancements to override server changes
-        applyEnhancements()
-    end
-end)
-
 -- Initialize system
 local function initializeSystem()
     safeCall(function()
-        local config = waitForChild(ReplicatedStorage, "CombatConfiguration", 15)
-        if not config then
-            warn("Enhanced Combat System v2.0: Configuration not found!")
-            return
-        end
-
-        backupOriginalValues()
-        applyEnhancements()
         createAdvancedGUI()
         
         if player.Character then
             enhanceCharacter(player.Character)
         end
         
-        print("Enhanced Combat System v2.0: Successfully initialized!")
+        print("DIRECT COMBAT BYPASS: Successfully initialized!")
         print("Press 'P' to toggle GUI")
-        print("New features: Direct cooldown manipulation, continuous updates")
+        print("This version uses DIRECT manipulation - bypassing server restrictions!")
     end)
 end
 
@@ -862,8 +620,8 @@ task.spawn(function()
 end)
 
 -- Global functions
-_G.InitializeEnhancedCombat = initializeSystem
-_G.CleanupEnhancedCombat = cleanup
+_G.InitializeDirectCombat = initializeSystem
+_G.CleanupDirectCombat = cleanup
 
 -- Game cleanup
 game:BindToClose(cleanup)
@@ -874,60 +632,25 @@ connections.playerRemoving = Players.PlayerRemoving:Connect(function(leavingPlay
     end
 end)
 
--- Status and emergency functions
-_G.EnhancedCombatStatus = function()
-    print("Enhanced Combat System v2.0 Status:")
+-- Status function
+_G.DirectCombatStatus = function()
+    print("DIRECT COMBAT BYPASS Status:")
     print("- Active Connections:", #connections)
+    print("- Attack Spamming:", attackSpamming)
     print("- GUI Visible:", playerGui:FindFirstChild("EnhancedCombatGUI") and true or false)
-    print("- Original Values Backed Up:", next(OriginalValues) ~= nil)
     print("- Current Settings:")
     for setting, value in pairs(EnhancedSettings) do
         print("  " .. setting .. ":", value)
     end
-    
-    -- Show current config values
-    local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
-    if config then
-        print("- Current Config Values:")
-        local attacking = config:FindFirstChild("Attacking")
-        if attacking then
-            local cooldowns = attacking:FindFirstChild("Cooldowns")
-            if cooldowns then
-                for i = 1, 3 do
-                    local cooldown = cooldowns:FindFirstChild(tostring(i))
-                    if cooldown then
-                        print("  Cooldown " .. i .. ":", cooldown.Value)
-                    end
-                end
-            end
-        end
-    end
 end
 
-_G.EmergencyResetCombat = function()
-    cleanup()
-    task.wait(1)
-    initializeSystem()
-    print("Enhanced Combat System v2.0: Emergency reset completed!")
-end
-
--- Force update function
-_G.ForceUpdateCombat = function()
-    applyEnhancements()
-    if player.Character then
-        enhanceCharacter(player.Character)
-    end
-    print("Enhanced Combat System v2.0: Force update completed!")
-end
-
-print("Enhanced Combat System v2.0: Script loaded!")
-print("Key improvements:")
-print("- Direct AttackCooldown manipulation")
-print("- Continuous configuration updates") 
-print("- Better server override protection")
+print("DIRECT COMBAT BYPASS: Script loaded!")
+print("NEW APPROACH:")
+print("- Cooldown: Attack spamming instead of config modification")
+print("- Hitbox: Temporary character size expansion") 
+print("- Direct CombatState manipulation")
+print("- No dependency on ReplicatedStorage values")
 print("Available commands:")
-print("- _G.InitializeEnhancedCombat() - Manual initialization")
-print("- _G.CleanupEnhancedCombat() - Clean shutdown")
-print("- _G.EnhancedCombatStatus() - Check system status")
-print("- _G.EmergencyResetCombat() - Emergency reset")
-print("- _G.ForceUpdateCombat() - Force update all settings")
+print("- _G.InitializeDirectCombat() - Manual initialization")
+print("- _G.CleanupDirectCombat() - Clean shutdown") 
+print("- _G.DirectCombatStatus() - Check system status")
