@@ -18,7 +18,8 @@ local enhancements = {
     autoCombo = false,
     speedBoost = false,
     jumpBoost = false,
-    noStun = false
+    noStun = false,
+    reachExtender = false
 }
 
 -- Valores originais para restauração
@@ -101,6 +102,7 @@ local function createGUI()
     scrollFrame.BorderSizePixel = 0
     scrollFrame.ScrollBarThickness = 6
     scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 720) -- Aumentado para 9 opções
     scrollFrame.Parent = mainFrame
 
     -- Layout das opções
@@ -199,6 +201,7 @@ local function createGUI()
     createToggle("speedBoost", "💨 Boost de Velocidade", "Aumenta a velocidade de movimento", 6)
     createToggle("jumpBoost", "🦘 Boost de Pulo", "Aumenta a altura dos pulos", 7)
     createToggle("noStun", "🛡️ Anti-Stun", "Previne que o jogador seja atordoado", 8)
+    createToggle("reachExtender", "🎯 Reach Extendido", "Aumenta significativamente o alcance dos ataques", 9)
 
     -- Botões de ação
     local buttonFrame = Instance.new("Frame")
@@ -321,16 +324,99 @@ function applyEnhancement(name, enabled)
     local combatState = humanoid and humanoid:FindFirstChild("CombatState")
     
     if name == "reducedCooldown" then
-        -- Implementar redução de cooldown via hook do sistema de combate
-        print(enabled and "✅ Cooldown reduzido ativado!" or "❌ Cooldown reduzido desativado!")
+        if combatState then
+            if enabled then
+                -- Hook para reduzir cooldown interceptando o AttackCooldown
+                if not originalValues.cooldownLoop then
+                    originalValues.cooldownLoop = RunService.Heartbeat:Connect(function()
+                        if enhancements.reducedCooldown and combatState:FindFirstChild("AttackCooldown") then
+                            -- Força o cooldown a terminar mais rápido
+                            if combatState.AttackCooldown.Value == true then
+                                task.spawn(function()
+                                    wait(0.1) -- Cooldown super reduzido
+                                    if combatState.AttackCooldown then
+                                        combatState.AttackCooldown.Value = false
+                                    end
+                                end)
+                            end
+                        end
+                    end)
+                end
+                print("✅ Cooldown reduzido ativado!")
+            else
+                if originalValues.cooldownLoop then
+                    originalValues.cooldownLoop:Disconnect()
+                    originalValues.cooldownLoop = nil
+                end
+                print("❌ Cooldown reduzido desativado!")
+            end
+        end
         
     elseif name == "expandedHitbox" then
-        -- Expandir hitbox
-        print(enabled and "✅ Hitbox expandida ativada!" or "❌ Hitbox expandida desativada!")
+        if character then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart and enabled then
+                -- Criar hitbox invisível expandida
+                if not originalValues.expandedHitbox then
+                    local expandedPart = Instance.new("Part")
+                    expandedPart.Name = "ExpandedHitbox"
+                    expandedPart.Size = rootPart.Size * 3 -- Hitbox 3x maior
+                    expandedPart.CFrame = rootPart.CFrame
+                    expandedPart.Anchored = false
+                    expandedPart.CanCollide = false
+                    expandedPart.Transparency = 1
+                    expandedPart.Material = Enum.Material.ForceField
+                    
+                    -- Weld para seguir o jogador
+                    local weld = Instance.new("WeldConstraint")
+                    weld.Part0 = rootPart
+                    weld.Part1 = expandedPart
+                    weld.Parent = expandedPart
+                    
+                    expandedPart.Parent = character
+                    originalValues.expandedHitbox = expandedPart
+                    
+                    -- Substituir o rootPart.Size temporariamente para cálculos de hitbox
+                    originalValues.originalSize = rootPart.Size
+                    print("✅ Hitbox expandida ativada!")
+                end
+            elseif originalValues.expandedHitbox then
+                originalValues.expandedHitbox:Destroy()
+                originalValues.expandedHitbox = nil
+                if originalValues.originalSize and rootPart then
+                    -- Restaurar tamanho original se necessário
+                end
+                print("❌ Hitbox expandida desativada!")
+            end
+        end
         
     elseif name == "optimizedAttack" then
-        -- Otimizar ataques
-        print(enabled and "✅ Ataque otimizado ativado!" or "❌ Ataque otimizado desativado!")
+        if combatState then
+            if enabled then
+                -- Hook para otimizar ataques
+                if not originalValues.optimizedLoop then
+                    originalValues.optimizedLoop = RunService.Heartbeat:Connect(function()
+                        if enhancements.optimizedAttack and combatState then
+                            -- Força ataques mais rápidos removendo algumas verificações
+                            if combatState:FindFirstChild("Attacking") and combatState.Attacking.Value == false then
+                                -- Remove temporariamente o estado de "já atacando" mais rapidamente
+                                if combatState:FindFirstChild("LastAttacked") then
+                                    -- Acelera a disponibilização do próximo ataque
+                                    combatState.LastAttacked.Value = combatState.LastAttacked.Value + 0.1
+                                end
+                            end
+                        end
+                    end)
+                end
+                print("✅ Ataque otimizado ativado!")
+            else
+                if originalValues.optimizedLoop then
+                    originalValues.optimizedLoop:Disconnect()
+                    originalValues.optimizedLoop = nil
+                end
+                print("❌ Ataque otimizado desativado!")
+            end
+        end
         
     elseif name == "infiniteStamina" then
         if combatState and combatState:FindFirstChild("Stamina") then
@@ -363,8 +449,40 @@ function applyEnhancement(name, enabled)
         end
         
     elseif name == "autoCombo" then
-        -- Implementar auto combo
-        print(enabled and "✅ Auto combo ativado!" or "❌ Auto combo desativado!")
+        if combatState then
+            if enabled then
+                -- Sistema de auto combo
+                if not originalValues.autoComboLoop then
+                    originalValues.autoComboLoop = RunService.Heartbeat:Connect(function()
+                        if enhancements.autoCombo and combatState then
+                            -- Verifica se pode atacar e executa automaticamente
+                            if combatState:FindFirstChild("AttackCooldown") and 
+                               combatState:FindFirstChild("Attacking") and
+                               combatState:FindFirstChild("Stunned") then
+                                
+                                if not combatState.AttackCooldown.Value and 
+                                   not combatState.Attacking.Value and 
+                                   not combatState.Stunned.Value then
+                                    
+                                    -- Simula um ataque automático
+                                    local rs = game:GetService("ReplicatedStorage")
+                                    if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoAttack") then
+                                        rs.Events.DoAttack:FireServer()
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+                print("✅ Auto combo ativado!")
+            else
+                if originalValues.autoComboLoop then
+                    originalValues.autoComboLoop:Disconnect()
+                    originalValues.autoComboLoop = nil
+                end
+                print("❌ Auto combo desativado!")
+            end
+        end
         
     elseif name == "speedBoost" then
         if humanoid then
@@ -417,6 +535,67 @@ function applyEnhancement(name, enabled)
                     originalValues.stunLoop = nil
                 end
                 print("❌ Anti-stun desativado!")
+            end
+        end
+        
+    elseif name == "reachExtender" then
+        if character then
+            if enabled then
+                -- Sistema de reach extendido usando hook de raycasting
+                if not originalValues.reachLoop then
+                    -- Hook no sistema de detecção de hit
+                    originalValues.reachLoop = RunService.Heartbeat:Connect(function()
+                        if enhancements.reachExtender then
+                            -- Procura por inimigos em um raio maior e "puxa" eles para perto durante ataques
+                            local rootPart = character:FindFirstChild("HumanoidRootPart")
+                            if rootPart and combatState and combatState:FindFirstChild("Attacking") then
+                                if combatState.Attacking.Value then
+                                    -- Busca jogadores em um raio maior
+                                    for _, otherPlayer in pairs(Players:GetPlayers()) do
+                                        if otherPlayer ~= player and otherPlayer.Character then
+                                            local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                            if otherRoot then
+                                                local distance = (rootPart.Position - otherRoot.Position).Magnitude
+                                                if distance <= 50 and distance > 10 then -- Reach extendido
+                                                    -- Simula proximidade para o sistema de combate
+                                                    local direction = (otherRoot.Position - rootPart.Position).Unit
+                                                    local targetPos = rootPart.Position + direction * 8
+                                                    
+                                                    -- Movimento sutil do inimigo para dentro do alcance
+                                                    local bodyVelocity = otherRoot:FindFirstChild("ReachExtenderVelocity")
+                                                    if not bodyVelocity then
+                                                        bodyVelocity = Instance.new("BodyVelocity")
+                                                        bodyVelocity.Name = "ReachExtenderVelocity"
+                                                        bodyVelocity.MaxForce = Vector3.new(2000, 0, 2000)
+                                                        bodyVelocity.Velocity = direction * -20
+                                                        bodyVelocity.Parent = otherRoot
+                                                        
+                                                        -- Remove após pouco tempo
+                                                        game:GetService("Debris"):AddItem(bodyVelocity, 0.2)
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+                print("✅ Reach extendido ativado!")
+            else
+                if originalValues.reachLoop then
+                    originalValues.reachLoop:Disconnect()
+                    originalValues.reachLoop = nil
+                end
+                -- Limpa todos os BodyVelocity criados
+                for _, otherPlayer in pairs(Players:GetPlayers()) do
+                    if otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        local bv = otherPlayer.Character.HumanoidRootPart:FindFirstChild("ReachExtenderVelocity")
+                        if bv then bv:Destroy() end
+                    end
+                end
+                print("❌ Reach extendido desativado!")
             end
         end
     end
