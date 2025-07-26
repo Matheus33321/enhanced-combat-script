@@ -1,731 +1,490 @@
 -- Enhanced Combat Script with GUI Menu
--- Para usar: loadstring(game:HttpGet("https://raw.githubusercontent.com/[seu-usuario]/[repositorio]/main/enhanced_combat.lua"))()
+-- Execute via: loadstring(game:HttpGet("https://raw.githubusercontent.com/your-repo/enhanced-combat.lua"))()
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Configurações das melhorias
-local enhancements = {
-    noCooldown = false,
-    expandedHitbox = false,
-    optimizedAttack = false,
-    infiniteStamina = false,
-    autoCombo = false,
-    speedBoost = false,
-    jumpBoost = false,
-    noStun = false,
-    reachExtender = false,
-    customBlockKey = false
+-- Configuration
+local EnhancedConfig = {
+    Enabled = false,
+    ReducedCooldown = false,
+    ExpandedHitbox = false,
+    OptimizedAttack = false,
+    UnlimitedStamina = false,
+    AutoCombo = false,
+    BypassBlock = false,
+    RangeMultiplier = 1.5,
+    CooldownMultiplier = 0.3,
+    HitboxMultiplier = 2.0,
+    StaminaCost = 0
 }
 
--- Valores originais para restauração
-local originalValues = {}
-
--- Configuração de tecla personalizada para defesa
-local customBlockKeyCode = Enum.KeyCode.V -- Tecla padrão (pode ser alterada)
-
--- Função para criar a GUI
+-- GUI Creation
 local function createGUI()
-    -- Remove GUI existente se houver
-    if playerGui:FindFirstChild("EnhancedCombatGUI") then
-        playerGui.EnhancedCombatGUI:Destroy()
-    end
-
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "EnhancedCombatGUI"
     screenGui.ResetOnSpawn = false
     screenGui.Parent = playerGui
 
-    -- Frame principal
+    -- Main Frame
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 400, 0, 500)
-    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    mainFrame.Size = UDim2.new(0, 350, 0, 450)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
 
-    -- Cantos arredondados
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = mainFrame
+    -- Corner rounding
+    local corner1 = Instance.new("UICorner")
+    corner1.CornerRadius = UDim.new(0, 10)
+    corner1.Parent = mainFrame
 
-    -- Barra superior
-    local titleBar = Instance.new("Frame")
-    titleBar.Name = "TitleBar"
-    titleBar.Size = UDim2.new(1, 0, 0, 40)
-    titleBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    titleBar.BorderSizePixel = 0
-    titleBar.Parent = mainFrame
-
-    local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 12)
-    titleCorner.Parent = titleBar
-
-    -- Título
+    -- Title
     local title = Instance.new("TextLabel")
     title.Name = "Title"
-    title.Size = UDim2.new(1, -100, 1, 0)
-    title.Position = UDim2.new(0, 10, 0, 0)
-    title.BackgroundTransparency = 1
-    title.Text = "🥊 Enhanced Combat Menu"
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    title.BorderSizePixel = 0
+    title.Text = "Enhanced Combat Menu"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextSize = 18
-    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextScaled = true
     title.Font = Enum.Font.GothamBold
-    title.Parent = titleBar
+    title.Parent = mainFrame
 
-    -- Botão fechar
+    local corner2 = Instance.new("UICorner")
+    corner2.CornerRadius = UDim.new(0, 10)
+    corner2.Parent = title
+
+    -- Close Button
     local closeButton = Instance.new("TextButton")
     closeButton.Name = "CloseButton"
     closeButton.Size = UDim2.new(0, 30, 0, 30)
-    closeButton.Position = UDim2.new(1, -35, 0, 5)
-    closeButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
+    closeButton.Position = UDim2.new(1, -40, 0, 10)
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
     closeButton.BorderSizePixel = 0
-    closeButton.Text = "✕"
+    closeButton.Text = "X"
     closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeButton.TextSize = 16
+    closeButton.TextScaled = true
     closeButton.Font = Enum.Font.GothamBold
-    closeButton.Parent = titleBar
+    closeButton.Parent = title
 
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 6)
-    closeCorner.Parent = closeButton
+    local corner3 = Instance.new("UICorner")
+    corner3.CornerRadius = UDim.new(0, 5)
+    corner3.Parent = closeButton
 
-    -- Scroll frame para opções
+    -- Scroll Frame
     local scrollFrame = Instance.new("ScrollingFrame")
     scrollFrame.Name = "ScrollFrame"
-    scrollFrame.Size = UDim2.new(1, -20, 1, -100)
-    scrollFrame.Position = UDim2.new(0, 10, 0, 50)
+    scrollFrame.Size = UDim2.new(1, -20, 1, -70)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 60)
     scrollFrame.BackgroundTransparency = 1
     scrollFrame.BorderSizePixel = 0
-    scrollFrame.ScrollBarThickness = 6
-    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 640) -- Ajustado para 8 opções
+    scrollFrame.ScrollBarThickness = 5
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     scrollFrame.Parent = mainFrame
 
-    -- Layout das opções
-    local layout = Instance.new("UIListLayout")
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 10)
-    layout.Parent = scrollFrame
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 10)
+    listLayout.Parent = scrollFrame
 
-    -- Função para criar toggle
-    local function createToggle(name, displayName, description, layoutOrder)
+    -- Toggle Functions
+    local function createToggle(name, description, configKey, layoutOrder)
         local toggleFrame = Instance.new("Frame")
-        toggleFrame.Name = name .. "Frame"
-        toggleFrame.Size = UDim2.new(1, -10, 0, 70)
-        toggleFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        toggleFrame.Name = name .. "Toggle"
+        toggleFrame.Size = UDim2.new(1, 0, 0, 60)
+        toggleFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         toggleFrame.BorderSizePixel = 0
         toggleFrame.LayoutOrder = layoutOrder
         toggleFrame.Parent = scrollFrame
 
-        local toggleCorner = Instance.new("UICorner")
-        toggleCorner.CornerRadius = UDim.new(0, 8)
-        toggleCorner.Parent = toggleFrame
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 8)
+        corner.Parent = toggleFrame
 
         local toggleButton = Instance.new("TextButton")
         toggleButton.Name = "ToggleButton"
-        toggleButton.Size = UDim2.new(0, 60, 0, 30)
-        toggleButton.Position = UDim2.new(1, -70, 0, 5)
-        toggleButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
+        toggleButton.Size = UDim2.new(0, 50, 0, 25)
+        toggleButton.Position = UDim2.new(1, -60, 0.5, -12.5)
+        toggleButton.BackgroundColor3 = EnhancedConfig[configKey] and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
         toggleButton.BorderSizePixel = 0
-        toggleButton.Text = ""
+        toggleButton.Text = EnhancedConfig[configKey] and "ON" or "OFF"
+        toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        toggleButton.TextScaled = true
+        toggleButton.Font = Enum.Font.GothamBold
         toggleButton.Parent = toggleFrame
 
         local buttonCorner = Instance.new("UICorner")
-        buttonCorner.CornerRadius = UDim.new(0, 15)
+        buttonCorner.CornerRadius = UDim.new(0, 5)
         buttonCorner.Parent = toggleButton
 
-        local toggleCircle = Instance.new("Frame")
-        toggleCircle.Name = "Circle"
-        toggleCircle.Size = UDim2.new(0, 26, 0, 26)
-        toggleCircle.Position = UDim2.new(0, 2, 0, 2)
-        toggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        toggleCircle.BorderSizePixel = 0
-        toggleCircle.Parent = toggleButton
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Name = "NameLabel"
+        nameLabel.Size = UDim2.new(1, -70, 0, 20)
+        nameLabel.Position = UDim2.new(0, 10, 0, 5)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = name
+        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.TextScaled = true
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.Parent = toggleFrame
 
-        local circleCorner = Instance.new("UICorner")
-        circleCorner.CornerRadius = UDim.new(0, 13)
-        circleCorner.Parent = toggleCircle
+        local descLabel = Instance.new("TextLabel")
+        descLabel.Name = "DescLabel"
+        descLabel.Size = UDim2.new(1, -70, 0, 15)
+        descLabel.Position = UDim2.new(0, 10, 0, 25)
+        descLabel.BackgroundTransparency = 1
+        descLabel.Text = description
+        descLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+        descLabel.TextXAlignment = Enum.TextXAlignment.Left
+        descLabel.TextScaled = true
+        descLabel.Font = Enum.Font.Gotham
+        descLabel.Parent = toggleFrame
 
-        local toggleLabel = Instance.new("TextLabel")
-        toggleLabel.Name = "Label"
-        toggleLabel.Size = UDim2.new(1, -80, 0, 25)
-        toggleLabel.Position = UDim2.new(0, 10, 0, 5)
-        toggleLabel.BackgroundTransparency = 1
-        toggleLabel.Text = displayName
-        toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        toggleLabel.TextSize = 16
-        toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-        toggleLabel.Font = Enum.Font.GothamSemibold
-        toggleLabel.Parent = toggleFrame
-
-        local toggleDesc = Instance.new("TextLabel")
-        toggleDesc.Name = "Description"
-        toggleDesc.Size = UDim2.new(1, -80, 0, 35)
-        toggleDesc.Position = UDim2.new(0, 10, 0, 30)
-        toggleDesc.BackgroundTransparency = 1
-        toggleDesc.Text = description
-        toggleDesc.TextColor3 = Color3.fromRGB(180, 180, 180)
-        toggleDesc.TextSize = 12
-        toggleDesc.TextXAlignment = Enum.TextXAlignment.Left
-        toggleDesc.TextYAlignment = Enum.TextYAlignment.Top
-        toggleDesc.TextWrapped = true
-        toggleDesc.Font = Enum.Font.Gotham
-        toggleDesc.Parent = toggleFrame
-
-        -- Função toggle
         toggleButton.MouseButton1Click:Connect(function()
-            enhancements[name] = not enhancements[name]
+            EnhancedConfig[configKey] = not EnhancedConfig[configKey]
+            toggleButton.Text = EnhancedConfig[configKey] and "ON" or "OFF"
+            toggleButton.BackgroundColor3 = EnhancedConfig[configKey] and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
             
-            local targetColor = enhancements[name] and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(255, 85, 85)
-            local targetPosition = enhancements[name] and UDim2.new(1, -28, 0, 2) or UDim2.new(0, 2, 0, 2)
-            
-            TweenService:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
-            TweenService:Create(toggleCircle, TweenInfo.new(0.2), {Position = targetPosition}):Play()
-            
-            applyEnhancement(name, enhancements[name])
+            -- Tween animation
+            local tween = TweenService:Create(toggleButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                Size = UDim2.new(0, 55, 0, 30)
+            })
+            tween:Play()
+            tween.Completed:Connect(function()
+                local backTween = TweenService:Create(toggleButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                    Size = UDim2.new(0, 50, 0, 25)
+                })
+                backTween:Play()
+            end)
         end)
-
-        return toggleFrame
     end
 
-    -- Criar toggles
-    createToggle("enhancedUser", "👑 Usuário Especial", "Simula ter o ID 19017521 com todas as melhorias do servidor", 1)
-    createToggle("manualAttack", "🎮 Ataque Manual", "Permite atacar manualmente com a tecla F (sem spam)", 2)
-    createToggle("infiniteStamina", "♾️ Stamina Infinita", "Remove o consumo de stamina para ataques", 3)
-    createToggle("speedBoost", "💨 Boost de Velocidade", "Aumenta a velocidade de movimento", 4)
-    createToggle("jumpBoost", "🦘 Boost de Pulo", "Aumenta a altura dos pulos", 5)
-    createToggle("noStun", "🛡️ Anti-Stun", "Previne que o jogador seja atordoado", 6)
-    createToggle("customBlockKey", "🔧 Tecla de Defesa", "Permite usar qualquer tecla para defender (padrão: V)", 7)
-    createToggle("autoBlock", "🛡️ Auto Defesa", "Defende automaticamente quando alguém ataca", 8)
+    -- Create Toggles
+    createToggle("Master Toggle", "Enable/Disable all enhancements", "Enabled", 1)
+    createToggle("Reduced Cooldown", "Reduce attack cooldown significantly", "ReducedCooldown", 2)
+    createToggle("Expanded Hitbox", "Increase hitbox size for easier hits", "ExpandedHitbox", 3)
+    createToggle("Optimized Attack", "Faster and more efficient attacks", "OptimizedAttack", 4)
+    createToggle("Unlimited Stamina", "Remove stamina cost for attacks", "UnlimitedStamina", 5)
+    createToggle("Auto Combo", "Automatically continue combos", "AutoCombo", 6)
+    createToggle("Bypass Block", "Ignore blocking defenses", "BypassBlock", 7)
 
-    -- Botões de ação
-    local buttonFrame = Instance.new("Frame")
-    buttonFrame.Name = "ButtonFrame"
-    buttonFrame.Size = UDim2.new(1, -20, 0, 40)
-    buttonFrame.Position = UDim2.new(0, 10, 1, -50)
-    buttonFrame.BackgroundTransparency = 1
-    buttonFrame.Parent = mainFrame
-
-    local enableAllButton = Instance.new("TextButton")
-    enableAllButton.Name = "EnableAllButton"
-    enableAllButton.Size = UDim2.new(0.48, 0, 1, 0)
-    enableAllButton.Position = UDim2.new(0, 0, 0, 0)
-    enableAllButton.BackgroundColor3 = Color3.fromRGB(85, 255, 127)
-    enableAllButton.BorderSizePixel = 0
-    enableAllButton.Text = "✅ Ativar Tudo"
-    enableAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    enableAllButton.TextSize = 14
-    enableAllButton.Font = Enum.Font.GothamBold
-    enableAllButton.Parent = buttonFrame
-
-    local enableAllCorner = Instance.new("UICorner")
-    enableAllCorner.CornerRadius = UDim.new(0, 8)
-    enableAllCorner.Parent = enableAllButton
-
-    local disableAllButton = Instance.new("TextButton")
-    disableAllButton.Name = "DisableAllButton"
-    disableAllButton.Size = UDim2.new(0.48, 0, 1, 0)
-    disableAllButton.Position = UDim2.new(0.52, 0, 0, 0)
-    disableAllButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
-    disableAllButton.BorderSizePixel = 0
-    disableAllButton.Text = "❌ Desativar Tudo"
-    disableAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    disableAllButton.TextSize = 14
-    disableAllButton.Font = Enum.Font.GothamBold
-    disableAllButton.Parent = buttonFrame
-
-    local disableAllCorner = Instance.new("UICorner")
-    disableAllCorner.CornerRadius = UDim.new(0, 8)
-    disableAllCorner.Parent = disableAllButton
-
-    -- Atualizar scroll frame
-    layout.Changed:Connect(function()
-        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    -- Update canvas size
+    listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 20)
     end)
 
-    -- Eventos dos botões
+    -- Drag functionality
+    local dragToggle = nil
+    local dragStart = nil
+    local startPos = nil
+
+    local function updateInput(input)
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragToggle = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragToggle = false
+                end
+            end)
+        end
+    end)
+
+    title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragToggle then
+                updateInput(input)
+            end
+        end
+    end)
+
+    -- Close button functionality
     closeButton.MouseButton1Click:Connect(function()
         screenGui:Destroy()
     end)
 
-    enableAllButton.MouseButton1Click:Connect(function()
-        for name, _ in pairs(enhancements) do
-            enhancements[name] = true
-            applyEnhancement(name, true)
-        end
-        updateAllToggles()
-    end)
-
-    disableAllButton.MouseButton1Click:Connect(function()
-        for name, _ in pairs(enhancements) do
-            enhancements[name] = false
-            applyEnhancement(name, false)
-        end
-        updateAllToggles()
-    end)
-
-    -- Função para atualizar todos os toggles
-    function updateAllToggles()
-        for name, enabled in pairs(enhancements) do
-            local frame = scrollFrame:FindFirstChild(name .. "Frame")
-            if frame then
-                local button = frame.ToggleButton
-                local circle = button.Circle
-                
-                local targetColor = enabled and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(255, 85, 85)
-                local targetPosition = enabled and UDim2.new(1, -28, 0, 2) or UDim2.new(0, 2, 0, 2)
-                
-                TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
-                TweenService:Create(circle, TweenInfo.new(0.2), {Position = targetPosition}):Play()
-            end
-        end
-    end
-
-    -- Tornar a GUI arrastável
-    local dragging = false
-    local dragStart = nil
-    local startPos = nil
-
-    titleBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = mainFrame.Position
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
+    -- Toggle GUI with key
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
+            mainFrame.Visible = not mainFrame.Visible
         end
     end)
 
     return screenGui
 end
 
--- Função para aplicar melhorias
-function applyEnhancement(name, enabled)
-    local character = player.Character
-    if not character then return end
-
-    local humanoid = character:FindFirstChild("Humanoid")
-    local combatState = humanoid and humanoid:FindFirstChild("CombatState")
+-- Enhanced Attack Function
+local function enhanceAttackSystem()
+    if not EnhancedConfig.Enabled then return end
     
-    if name == "enhancedUser" then
-        if enabled then
-            -- Hook para fazer o servidor pensar que somos o usuário especial (ID: 19017521)
-            if not originalValues.userIdHook then
-                -- Salva o ID original
-                originalValues.originalUserId = player.UserId
-                
-                -- Cria um hook para interceptar verificações de userId
-                originalValues.userIdHook = true
-                
-                -- Tenta modificar temporariamente o UserId (pode não funcionar em todos os casos)
-                -- O servidor já tem todas as melhorias para o ID 19017521:
-                -- - RangesHitbox (hitbox expandida)
-                -- - CooldownsCombos (cooldown reduzido)
-                -- - EnhancedHitboxSize (hitbox especial)
-                
-                print("✅ Modo usuário especial ativado!")
-                print("🔧 Agora você tem acesso às melhorias do servidor:")
-                print("   📦 Hitbox expandida automática")
-                print("   ⚡ Cooldown reduzido automático") 
-                print("   🎯 Alcance estendido automático")
-            end
-        else
-            if originalValues.userIdHook then
-                originalValues.userIdHook = nil
-                print("❌ Modo usuário especial desativado!")
+    local rs = ReplicatedStorage
+    local ss = ServerStorage
+    
+    -- Wait for required services
+    local config = rs:WaitForChild("CombatConfiguration", 5)
+    if not config then
+        warn("CombatConfiguration not found")
+        return
+    end
+    
+    local rsEvents = rs:WaitForChild("Events", 5)
+    if not rsEvents then
+        warn("ReplicatedStorage Events not found")
+        return
+    end
+
+    -- Override the original attack function
+    local originalDoAttack = rsEvents.DoAttack.OnServerEvent
+    
+    -- Enhanced doAttack function
+    local function enhancedDoAttack(plr)
+        local char = plr.Character
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChild("Humanoid")
+
+        if not (char and hum and hum.Health > 0 and root) then
+            return
+        end
+
+        local combatState = hum:FindFirstChild("CombatState")
+        if not combatState then
+            return
+        end
+
+        local stamina = combatState.Stamina
+
+        -- Unlimited Stamina
+        local attackCost = EnhancedConfig.UnlimitedStamina and 0 or config.Stamina.MinStamina.Value
+        if stamina.Value < attackCost then
+            if EnhancedConfig.UnlimitedStamina then
+                stamina.Value = 100 -- Refill stamina
+            else
+                return
             end
         end
-        
-    elseif name == "manualAttack" then
-        if enabled then
-            -- Sistema de ataque manual (sem spam)
-            if not originalValues.manualAttackConnection then
-                print("🎮 Ataque manual ativado!")
-                print("💡 Pressione 'O' para alterar a tecla de ataque")
-                print("⚔️ Tecla atual: " .. attackKeyCode.Name)
-                
-                -- Conexão para alterar a tecla de ataque
-                originalValues.attackKeyChangeConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                    if not gameProcessed and input.KeyCode == Enum.KeyCode.O and enhancements.manualAttack then
-                        print("🔧 Digite o nome da nova tecla de ataque:")
-                        local connection
-                        connection = UserInputService.InputBegan:Connect(function(newInput, newGameProcessed)
-                            if not newGameProcessed and newInput.KeyCode ~= Enum.KeyCode.O then
-                                attackKeyCode = newInput.KeyCode
-                                print("✅ Nova tecla de ataque definida: " .. attackKeyCode.Name)
-                                connection:Disconnect()
-                            end
-                        end)
-                    end
-                end)
-                
-                -- Sistema de ataque manual
-                originalValues.manualAttackConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                    if not gameProcessed and input.KeyCode == attackKeyCode and enhancements.manualAttack then
-                        -- Ataque manual sem spam
-                        local rs = game:GetService("ReplicatedStorage")
-                        if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoAttack") then
-                            rs.Events.DoAttack:FireServer()
-                        end
-                    end
-                end)
-            end
-        else
-            if originalValues.manualAttackConnection then
-                originalValues.manualAttackConnection:Disconnect()
-                originalValues.manualAttackConnection = nil
-            end
-            if originalValues.attackKeyChangeConnection then
-                originalValues.attackKeyChangeConnection:Disconnect()
-                originalValues.attackKeyChangeConnection = nil
-            end
-            print("❌ Ataque manual desativado!")
+
+        if combatState.Attacking.Value and not EnhancedConfig.OptimizedAttack then
+            return
         end
-        
-    elseif name == "infiniteStamina" then
-        if combatState and combatState:FindFirstChild("Stamina") then
-            if enabled then
-                -- Salvar valor original
-                if not originalValues.stamina then
-                    originalValues.stamina = combatState.Stamina.Value
-                end
-                
-                -- Loop para manter stamina no máximo
-                if not originalValues.staminaLoop then
-                    originalValues.staminaLoop = RunService.Heartbeat:Connect(function()
-                        if enhancements.infiniteStamina and combatState.Stamina then
-                            combatState.Stamina.Value = 100
-                        end
+
+        stamina.Value = math.max(0, stamina.Value - attackCost)
+
+        local comboExpireTime = config.Combo.ExpireTime.Value
+        local baseAttackRange = config.Attacking.Ranges[tostring(combatState.Combo.Value)].Value
+        local attackRange = EnhancedConfig.ExpandedHitbox and baseAttackRange * EnhancedConfig.RangeMultiplier or baseAttackRange
+
+        if not combatState.Stunned.Value and (not combatState.AttackCooldown.Value or EnhancedConfig.OptimizedAttack) then
+            combatState.AttackCooldown.Value = true
+            combatState.Attacking.Value = true
+
+            combatState.Combo.Value += 1
+            local attackAnimations = config:WaitForChild("Attacking"):WaitForChild("Animations"):GetChildren()
+            
+            if combatState.Combo.Value > #attackAnimations or tick() - combatState.LastAttacked.Value >= comboExpireTime then
+                combatState.Combo.Value = 1
+            end
+            combatState.LastAttacked.Value = tick()
+
+            task.spawn(function()
+                -- Play woosh sound
+                local wooshes = config.SoundEffects.Wooshes:GetChildren()
+                if #wooshes > 0 then
+                    local wooshSound = wooshes[math.random(1, #wooshes)]:Clone()
+                    wooshSound.Parent = root
+                    wooshSound:Play()
+                    wooshSound.Ended:Connect(function()
+                        wooshSound:Destroy()
                     end)
                 end
-                print("✅ Stamina infinita ativada!")
-            else
-                -- Restaurar valor original e parar loop
-                if originalValues.staminaLoop then
-                    originalValues.staminaLoop:Disconnect()
-                    originalValues.staminaLoop = nil
-                end
-                if originalValues.stamina then
-                    combatState.Stamina.Value = originalValues.stamina
-                end
-                print("❌ Stamina infinita desativada!")
-            end
-        end
-        
-    elseif name == "autoCombo" then
-        if combatState then
-            if enabled then
-                -- Sistema de auto combo
-                if not originalValues.autoComboLoop then
-                    originalValues.autoComboLoop = RunService.Heartbeat:Connect(function()
-                        if enhancements.autoCombo and combatState then
-                            -- Verifica se pode atacar e executa automaticamente
-                            if combatState:FindFirstChild("AttackCooldown") and 
-                               combatState:FindFirstChild("Attacking") and
-                               combatState:FindFirstChild("Stunned") then
-                                
-                                if not combatState.AttackCooldown.Value and 
-                                   not combatState.Attacking.Value and 
-                                   not combatState.Stunned.Value then
-                                    
-                                    -- Simula um ataque automático
-                                    local rs = game:GetService("ReplicatedStorage")
-                                    if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoAttack") then
-                                        rs.Events.DoAttack:FireServer()
-                                    end
-                                end
+
+                -- Knockback
+                local direction = root.CFrame.LookVector
+                local knockback = config.Attacking.Dash[tostring(combatState.Combo.Value)].Value
+                rsEvents.DealKnockback:FireClient(plr, direction, knockback)
+
+                -- Animation
+                local animation = config.Attacking.Animations[tostring(combatState.Combo.Value)]
+                if animation then
+                    local animTrack = hum.Animator:LoadAnimation(animation)
+                    animTrack:Play()
+
+                    animTrack:GetMarkerReachedSignal("Hit"):Connect(function(attackingBodyPart)
+                        local bodyPart = char[attackingBodyPart]
+                        if not bodyPart then return end
+                        
+                        local bodyPartBottom = bodyPart.CFrame - bodyPart.CFrame.UpVector * bodyPart.Size.Y / 2
+
+                        -- Enhanced hitbox
+                        local hitboxSize = EnhancedConfig.ExpandedHitbox and root.Size * EnhancedConfig.HitboxMultiplier or root.Size
+
+                        local charactersToInclude = {}
+                        for _, otherPlayer in pairs(Players:GetPlayers()) do
+                            if otherPlayer ~= plr and otherPlayer.Character and otherPlayer.Character:FindFirstChild("Humanoid") and otherPlayer.Character.Humanoid.Health > 0 then
+                                table.insert(charactersToInclude, otherPlayer.Character)
                             end
                         end
-                    end)
-                end
-                print("✅ Auto combo ativado!")
-            else
-                if originalValues.autoComboLoop then
-                    originalValues.autoComboLoop:Disconnect()
-                    originalValues.autoComboLoop = nil
-                end
-                print("❌ Auto combo desativado!")
-            end
-        end
-        
-    elseif name == "speedBoost" then
-        if humanoid then
-            if enabled then
-                if not originalValues.walkSpeed then
-                    originalValues.walkSpeed = humanoid.WalkSpeed
-                end
-                humanoid.WalkSpeed = originalValues.walkSpeed * 2
-                print("✅ Boost de velocidade ativado!")
-            else
-                if originalValues.walkSpeed then
-                    humanoid.WalkSpeed = originalValues.walkSpeed
-                end
-                print("❌ Boost de velocidade desativado!")
-            end
-        end
-        
-    elseif name == "jumpBoost" then
-        if humanoid then
-            if enabled then
-                if not originalValues.jumpPower then
-                    originalValues.jumpPower = humanoid.JumpPower
-                end
-                humanoid.JumpPower = originalValues.jumpPower * 2
-                print("✅ Boost de pulo ativado!")
-            else
-                if originalValues.jumpPower then
-                    humanoid.JumpPower = originalValues.jumpPower
-                end
-                print("❌ Boost de pulo desativado!")
-            end
-        end
-        
-    elseif name == "noStun" then
-        if combatState and combatState:FindFirstChild("Stunned") then
-            if enabled then
-                -- Loop para manter não atordoado
-                if not originalValues.stunLoop then
-                    originalValues.stunLoop = RunService.Heartbeat:Connect(function()
-                        if enhancements.noStun and combatState.Stunned then
-                            combatState.Stunned.Value = false
-                        end
-                    end)
-                end
-                print("✅ Anti-stun ativado!")
-            else
-                -- Parar loop
-                if originalValues.stunLoop then
-                    originalValues.stunLoop:Disconnect()
-                    originalValues.stunLoop = nil
-                end
-                print("❌ Anti-stun desativado!")
-            end
-        end
-        
-    elseif name == "reachExtender" then
-        if character then
-            if enabled then
-                -- Sistema de reach extendido usando hook de raycasting
-                if not originalValues.reachLoop then
-                    -- Hook no sistema de detecção de hit
-                    originalValues.reachLoop = RunService.Heartbeat:Connect(function()
-                        if enhancements.reachExtender then
-                            -- Procura por inimigos em um raio maior e "puxa" eles para perto durante ataques
-                            local rootPart = character:FindFirstChild("HumanoidRootPart")
-                            if rootPart and combatState and combatState:FindFirstChild("Attacking") then
-                                if combatState.Attacking.Value then
-                                    -- Busca jogadores em um raio maior
-                                    for _, otherPlayer in pairs(Players:GetPlayers()) do
-                                        if otherPlayer ~= player and otherPlayer.Character then
-                                            local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                            if otherRoot then
-                                                local distance = (rootPart.Position - otherRoot.Position).Magnitude
-                                                if distance <= 50 and distance > 10 then -- Reach extendido
-                                                    -- Simula proximidade para o sistema de combate
-                                                    local direction = (otherRoot.Position - rootPart.Position).Unit
-                                                    local targetPos = rootPart.Position + direction * 8
-                                                    
-                                                    -- Movimento sutil do inimigo para dentro do alcance
-                                                    local bodyVelocity = otherRoot:FindFirstChild("ReachExtenderVelocity")
-                                                    if not bodyVelocity then
-                                                        bodyVelocity = Instance.new("BodyVelocity")
-                                                        bodyVelocity.Name = "ReachExtenderVelocity"
-                                                        bodyVelocity.MaxForce = Vector3.new(2000, 0, 2000)
-                                                        bodyVelocity.Velocity = direction * -20
-                                                        bodyVelocity.Parent = otherRoot
-                                                        
-                                                        -- Remove após pouco tempo
-                                                        game:GetService("Debris"):AddItem(bodyVelocity, 0.2)
-                                                    end
+
+                        local hitTarget = false
+
+                        -- Enhanced hitbox detection
+                        if EnhancedConfig.ExpandedHitbox then
+                            local hitboxCFrame = root.CFrame
+                            local overlapParams = OverlapParams.new()
+                            overlapParams.FilterType = Enum.RaycastFilterType.Include
+                            overlapParams.FilterDescendantsInstances = charactersToInclude
+
+                            local nearbyParts = workspace:GetPartBoundsInBox(hitboxCFrame, hitboxSize, overlapParams)
+
+                            for _, part in pairs(nearbyParts) do
+                                local hitChar = part.Parent
+                                if hitChar:FindFirstChild("Humanoid") or (hitChar.Parent and hitChar.Parent:FindFirstChild("Humanoid")) then
+                                    hitChar = hitChar:FindFirstChild("Humanoid") and hitChar or hitChar.Parent
+                                    if hitChar.Humanoid.Health > 0 then
+                                        local bypassBlock = EnhancedConfig.BypassBlock
+                                        local knockbackDirection = -bodyPart.CFrame.UpVector
+                                        
+                                        -- Create effect
+                                        task.spawn(function()
+                                            local comboParticleFolder = config.ParticleEffects.Combos[tostring(combatState.Combo.Value)]
+                                            local comboParticle = comboParticleFolder.ParticleContainer:Clone()
+                                            comboParticle.CFrame = CFrame.new(bodyPartBottom.Position, -bodyPart.CFrame.UpVector * 1000)
+                                            comboParticle.Parent = workspace["EFFECTS CONTAINER"]
+                                            
+                                            local comboSound = config.SoundEffects.Combos[tostring(combatState.Combo.Value)]:Clone()
+                                            if not bypassBlock then
+                                                comboSound.Volume *= config.SoundEffects.BlockNoiseMultiplier.Value
+                                                local pitchShift = Instance.new("PitchShiftSoundEffect")
+                                                pitchShift.Octave = config.SoundEffects.BlockPitchMultiplier.Value
+                                                pitchShift.Parent = comboSound
+                                            end
+                                            comboSound.Parent = comboParticle
+                                            comboSound:Play()
+                                            
+                                            task.wait(comboParticleFolder.DisableAfter.Value)
+                                            -- Disable effect
+                                            for _, d in pairs(comboParticle:GetDescendants()) do
+                                                if d:IsA("ParticleEmitter") or d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight") then
+                                                    d.Enabled = false
                                                 end
                                             end
+                                        end)
+                                        
+                                        if ss and ss:FindFirstChild("Events") and ss.Events:FindFirstChild("DealDamage") then
+                                            ss.Events.DealDamage:Fire(char, hitChar, bypassBlock, knockbackDirection)
                                         end
+                                        hitTarget = true
+                                        break
                                     end
                                 end
                             end
                         end
-                    end)
-                end
-                print("✅ Reach extendido ativado!")
-            else
-                if originalValues.reachLoop then
-                    originalValues.reachLoop:Disconnect()
-                    originalValues.reachLoop = nil
-                end
-                -- Limpa todos os BodyVelocity criados
-                for _, otherPlayer in pairs(Players:GetPlayers()) do
-                    if otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                        local bv = otherPlayer.Character.HumanoidRootPart:FindFirstChild("ReachExtenderVelocity")
-                        if bv then bv:Destroy() end
-                    end
-                print("❌ Anti-stun desativado!")
-            end
-        end
-        
-    elseif name == "customBlockKey" then
-        if enabled then
-            -- Sistema de tecla personalizada para defesa
-            if not originalValues.customBlockConnection then
-                print("🔧 Sistema de defesa personalizado ativado!")
-                print("💡 Pressione 'P' para alterar a tecla de defesa")
-                print("🛡️ Tecla atual: " .. customBlockKeyCode.Name)
-                
-                -- Conexão para alterar a tecla
-                originalValues.keyChangeConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                    if not gameProcessed and input.KeyCode == Enum.KeyCode.P and enhancements.customBlockKey then
-                        print("🔧 Digite o nome da nova tecla de defesa:")
-                        local connection
-                        connection = UserInputService.InputBegan:Connect(function(newInput, newGameProcessed)
-                            if not newGameProcessed and newInput.KeyCode ~= Enum.KeyCode.P then
-                                customBlockKeyCode = newInput.KeyCode
-                                print("✅ Nova tecla de defesa definida: " .. customBlockKeyCode.Name)
-                                connection:Disconnect()
-                            end
-                        end)
-                    end
-                end)
-                
-                -- Sistema de defesa personalizado
-                originalValues.customBlockConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                    if not gameProcessed and input.KeyCode == customBlockKeyCode and enhancements.customBlockKey then
-                        local rs = game:GetService("ReplicatedStorage")
-                        if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoBlock") then
-                            rs.Events.DoBlock:FireServer(true)
-                        end
-                    end
-                end)
-                
-                originalValues.customBlockConnectionEnd = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-                    if not gameProcessed and input.KeyCode == customBlockKeyCode and enhancements.customBlockKey then
-                        local rs = game:GetService("ReplicatedStorage")
-                        if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoBlock") then
-                            rs.Events.DoBlock:FireServer(false)
-                        end
-                    end
-                end)
-            end
-        else
-            if originalValues.customBlockConnection then
-                originalValues.customBlockConnection:Disconnect()
-                originalValues.customBlockConnection = nil
-            end
-            if originalValues.customBlockConnectionEnd then
-                originalValues.customBlockConnectionEnd:Disconnect()
-                originalValues.customBlockConnectionEnd = nil
-            end
-            if originalValues.keyChangeConnection then
-                originalValues.keyChangeConnection:Disconnect()
-                originalValues.keyChangeConnection = nil
-            end
-            print("❌ Sistema de defesa personalizado desativado!")
-        end
-        
-    elseif name == "autoBlock" then
-        if combatState then
-            if enabled then
-                -- Sistema de defesa automática
-                if not originalValues.autoBlockLoop then
-                    originalValues.autoBlockLoop = RunService.Heartbeat:Connect(function()
-                        if enhancements.autoBlock then
-                            -- Detecta jogadores próximos atacando
-                            for _, otherPlayer in pairs(Players:GetPlayers()) do
-                                if otherPlayer ~= player and otherPlayer.Character then
-                                    local otherHumanoid = otherPlayer.Character:FindFirstChild("Humanoid")
-                                    local otherCombatState = otherHumanoid and otherHumanoid:FindFirstChild("CombatState")
-                                    local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                    local myRoot = character:FindFirstChild("HumanoidRootPart")
-                                    
-                                    if otherCombatState and otherRoot and myRoot then
-                                        if otherCombatState:FindFirstChild("Attacking") and otherCombatState.Attacking.Value then
-                                            local distance = (myRoot.Position - otherRoot.Position).Magnitude
-                                            if distance <= 15 then -- Se estiver próximo e atacando
-                                                -- Ativa defesa automaticamente
-                                                local rs = game:GetService("ReplicatedStorage")
-                                                if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoBlock") then
-                                                    rs.Events.DoBlock:FireServer(true)
-                                                    -- Para a defesa após um tempo
-                                                    task.spawn(function()
-                                                        wait(0.5)
-                                                        if rs.Events.DoBlock then
-                                                            rs.Events.DoBlock:FireServer(false)
-                                                        end
-                                                    end)
-                                                end
-                                                break
-                                            end
+
+                        -- Regular raycast if enhanced hitbox didn't hit
+                        if not hitTarget then
+                            local rp = RaycastParams.new()
+                            rp.FilterType = Enum.RaycastFilterType.Include
+                            rp.FilterDescendantsInstances = charactersToInclude
+
+                            local hitRay = workspace:Blockcast(root.CFrame, hitboxSize, root.CFrame.LookVector * attackRange, rp)
+
+                            if hitRay then
+                                local hitChar = hitRay.Instance.Parent
+                                if hitChar:FindFirstChild("Humanoid") or (hitChar.Parent and hitChar.Parent:FindFirstChild("Humanoid")) then
+                                    hitChar = hitChar:FindFirstChild("Humanoid") and hitChar or hitChar.Parent
+                                    if hitChar.Humanoid.Health > 0 then
+                                        local bypassBlock = EnhancedConfig.BypassBlock or hitRay.Normal == Enum.NormalId.Back
+                                        local knockbackDirection = -bodyPart.CFrame.UpVector
+                                        
+                                        -- Create effect (simplified)
+                                        task.spawn(function()
+                                            local comboParticleFolder = config.ParticleEffects.Combos[tostring(combatState.Combo.Value)]
+                                            local comboParticle = comboParticleFolder.ParticleContainer:Clone()
+                                            comboParticle.CFrame = CFrame.new(bodyPartBottom.Position, -bodyPart.CFrame.UpVector * 1000)
+                                            comboParticle.Parent = workspace["EFFECTS CONTAINER"]
+                                            
+                                            local comboSound = config.SoundEffects.Combos[tostring(combatState.Combo.Value)]:Clone()
+                                            comboSound.Parent = comboParticle
+                                            comboSound:Play()
+                                        end)
+                                        
+                                        if ss and ss:FindFirstChild("Events") and ss.Events:FindFirstChild("DealDamage") then
+                                            ss.Events.DealDamage:Fire(char, hitChar, bypassBlock, knockbackDirection)
                                         end
+                                        hitTarget = true
                                     end
                                 end
                             end
                         end
+
+                        -- Auto combo logic
+                        if not hitTarget and config.Combo.CanComboWithoutHitting.Value == false and not EnhancedConfig.AutoCombo then
+                            combatState.LastAttacked.Value = 0
+                        end
+                    end)
+
+                    animTrack.Stopped:Connect(function()
+                        animTrack:Destroy()
                     end)
                 end
-                print("✅ Auto defesa ativada!")
-            else
-                if originalValues.autoBlockLoop then
-                    originalValues.autoBlockLoop:Disconnect()
-                    originalValues.autoBlockLoop = nil
-                end
-                print("❌ Auto defesa desativada!")
-            end
+            end)
+
+            -- Enhanced cooldown
+            local baseCooldownTime = config.Attacking.Cooldowns[tostring(combatState.Combo.Value)].Value
+            local cooldownTime = EnhancedConfig.ReducedCooldown and baseCooldownTime * EnhancedConfig.CooldownMultiplier or baseCooldownTime
+            
+            task.wait(cooldownTime)
+
+            combatState.Attacking.Value = false
+            combatState.AttackCooldown.Value = false
         end
+    end
+
+    -- Connect the enhanced function
+    if rsEvents:FindFirstChild("DoAttack") then
+        rsEvents.DoAttack.OnServerEvent:Connect(enhancedDoAttack)
     end
 end
 
--- Função principal
-local function main()
-    -- Aguardar o jogo carregar completamente
-    if not game:IsLoaded() then
-        game.Loaded:Wait()
-    end
+-- Auto-stamina refill
+local function autoStaminaRefill()
+    if not EnhancedConfig.Enabled or not EnhancedConfig.UnlimitedStamina then return end
     
-    wait(2) -- Aguardar um pouco mais para garantir que tudo carregou
-    
-    print("🚀 Enhanced Combat Script carregado!")
-    print("📋 Abrindo menu de configurações...")
-    
-    createGUI()
-    
-    -- Recriar GUI quando o jogador renascer
-    player.CharacterAdded:Connect(function()
-        wait(2)
-        if playerGui:FindFirstChild("EnhancedCombatGUI") then
-            createGUI()
+    RunService.Heartbeat:Connect(function()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            local combatState = player.Character.Humanoid:FindFirstChild("CombatState")
+            if combatState and combatState:FindFirstChild("Stamina") then
+                combatState.Stamina.Value = 100
+            end
         end
     end)
 end
 
--- Executar o script
-main()
+-- Initialize
+local function initialize()
+    createGUI()
+    enhanceAttackSystem()
+    autoStaminaRefill()
+    
+    print("Enhanced Combat Script loaded! Press Right Ctrl to toggle menu.")
+end
 
--- Adicionar comando para reabrir o menu
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.Insert then
-        if playerGui:FindFirstChild("EnhancedCombatGUI") then
-            playerGui.EnhancedCombatGUI:Destroy()
-        else
-            createGUI()
-        end
-    end
-end)
-
-print("💡 Pressione INSERT para abrir/fechar o menu!")
+-- Run initialization
+initialize()
