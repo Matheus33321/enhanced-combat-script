@@ -89,140 +89,10 @@ local function waitForChild(parent, childName, timeout)
     timeout = timeout or 10
     
     while not parent:FindFirstChild(childName) and tick() - startTime < timeout do
-        task.wait(0.1) -- Mudança: wait() para task.wait()
+        task.wait(0.1)
     end
     
     return parent:FindFirstChild(childName)
-end
-
--- Create Enhanced Configuration Structure
-local function createEnhancedStructure()
-    safeCall(function()
-        local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
-        if not config then return end
-
-        local attacking = config:FindFirstChild("Attacking")
-        if attacking then
-            -- Enhanced Cooldowns Folder
-            if not attacking:FindFirstChild("CooldownsCombos") then
-                local cooldownsCombos = Instance.new("Folder")
-                cooldownsCombos.Name = "CooldownsCombos"
-                cooldownsCombos.Parent = attacking
-                
-                local originalCooldowns = attacking:FindFirstChild("Cooldowns")
-                if originalCooldowns then
-                    for _, cooldown in pairs(originalCooldowns:GetChildren()) do
-                        local newCooldown = cooldown:Clone()
-                        newCooldown.Parent = cooldownsCombos
-                    end
-                end
-            end
-            
-            -- Enhanced Hitbox Ranges Folder
-            if not attacking:FindFirstChild("RangesHitbox") then
-                local rangesHitbox = Instance.new("Folder")
-                rangesHitbox.Name = "RangesHitbox"
-                rangesHitbox.Parent = attacking
-                
-                local originalRanges = attacking:FindFirstChild("Ranges")
-                if originalRanges then
-                    for _, range in pairs(originalRanges:GetChildren()) do
-                        local newRange = range:Clone()
-                        newRange.Parent = rangesHitbox
-                    end
-                end
-            end
-            
-            -- Enhanced Hitbox Size
-            if not attacking:FindFirstChild("EnhancedHitboxSize") then
-                local enhancedHitboxSize = Instance.new("Vector3Value")
-                enhancedHitboxSize.Name = "EnhancedHitboxSize"
-                enhancedHitboxSize.Value = Vector3.new(10, 10, 10)
-                enhancedHitboxSize.Parent = attacking
-            end
-            
-            -- Enhanced Dash Values
-            if not attacking:FindFirstChild("EnhancedDash") then
-                local enhancedDash = Instance.new("Folder")
-                enhancedDash.Name = "EnhancedDash"
-                enhancedDash.Parent = attacking
-                
-                local originalDash = attacking:FindFirstChild("Dash")
-                if originalDash then
-                    for _, dash in pairs(originalDash:GetChildren()) do
-                        local newDash = dash:Clone()
-                        newDash.Parent = enhancedDash
-                    end
-                end
-            end
-        end
-        
-        -- Enhanced Damage Structure
-        local damage = config:FindFirstChild("Damage")
-        if damage then
-            if not damage:FindFirstChild("EnhancedComboDamage") then
-                local enhancedComboDamage = Instance.new("Folder")
-                enhancedComboDamage.Name = "EnhancedComboDamage"
-                enhancedComboDamage.Parent = damage
-                
-                local originalComboDamage = damage:FindFirstChild("ComboDamage")
-                if originalComboDamage then
-                    for _, dmg in pairs(originalComboDamage:GetChildren()) do
-                        local newDmg = dmg:Clone()
-                        newDmg.Parent = enhancedComboDamage
-                    end
-                end
-            end
-        end
-        
-        -- Enhanced Knockback Structure
-        local knockback = config:FindFirstChild("Knockback")
-        if knockback then
-            if not knockback:FindFirstChild("EnhancedComboKnockback") then
-                local enhancedKnockback = Instance.new("Folder")
-                enhancedKnockback.Name = "EnhancedComboKnockback"
-                enhancedKnockback.Parent = knockback
-                
-                local originalKnockback = knockback:FindFirstChild("ComboKnockback")
-                if originalKnockback then
-                    for _, kb in pairs(originalKnockback:GetChildren()) do
-                        local newKb = kb:Clone()
-                        newKb.Parent = enhancedKnockback
-                    end
-                end
-            end
-        end
-        
-        -- Enhanced Blocking Structure
-        local blocking = config:FindFirstChild("Blocking")
-        if blocking and not blocking:FindFirstChild("EnhancedBlock") then
-            local enhancedBlock = Instance.new("Folder")
-            enhancedBlock.Name = "EnhancedBlock"
-            enhancedBlock.Parent = blocking
-            
-            local autoBlockRange = Instance.new("NumberValue")
-            autoBlockRange.Name = "AutoBlockRange"
-            autoBlockRange.Value = 20
-            autoBlockRange.Parent = enhancedBlock
-            
-            local blockEfficiency = Instance.new("NumberValue")
-            blockEfficiency.Name = "BlockEfficiency"
-            blockEfficiency.Value = 0.98
-            blockEfficiency.Parent = enhancedBlock
-            
-            local perfectBlock = Instance.new("BoolValue")
-            perfectBlock.Name = "PerfectBlock"
-            perfectBlock.Value = false
-            perfectBlock.Parent = enhancedBlock
-        end
-        
-        -- Enhanced Users Marker
-        if not config:FindFirstChild("EnhancedUsers") then
-            local enhancedUsers = Instance.new("Folder")
-            enhancedUsers.Name = "EnhancedUsers"
-            enhancedUsers.Parent = config
-        end
-    end)
 end
 
 -- Backup original values
@@ -308,7 +178,7 @@ local function backupOriginalValues()
     end)
 end
 
--- Apply enhanced configurations
+-- Apply enhanced configurations (agora trabalha diretamente com os valores originais)
 local function applyEnhancements()
     safeCall(function()
         local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
@@ -316,65 +186,58 @@ local function applyEnhancements()
 
         local attacking = config:FindFirstChild("Attacking")
         if attacking then
-            -- Apply cooldown modifications to enhanced folder
-            local cooldownsCombos = attacking:FindFirstChild("CooldownsCombos")
-            if cooldownsCombos then
+            -- Apply cooldown modifications directly
+            local cooldowns = attacking:FindFirstChild("Cooldowns")
+            if cooldowns then
                 local multiplier = ConfigLevels.Cooldown[EnhancedSettings.CooldownLevel]
                 for i = 1, 10 do
-                    local cooldown = cooldownsCombos:FindFirstChild(tostring(i))
+                    local cooldown = cooldowns:FindFirstChild(tostring(i))
                     if cooldown and OriginalValues.AttackCooldowns[i] then
                         cooldown.Value = math.max(0.01, OriginalValues.AttackCooldowns[i] * multiplier)
                     end
                 end
             end
             
-            -- Apply hitbox modifications to enhanced folder
-            local rangesHitbox = attacking:FindFirstChild("RangesHitbox")
-            if rangesHitbox then
+            -- Apply range modifications directly
+            local ranges = attacking:FindFirstChild("Ranges")
+            if ranges then
                 local multiplier = ConfigLevels.Range[EnhancedSettings.RangeBoost]
                 for i = 1, 10 do
-                    local range = rangesHitbox:FindFirstChild(tostring(i))
+                    local range = ranges:FindFirstChild(tostring(i))
                     if range and OriginalValues.AttackRanges[i] then
                         range.Value = OriginalValues.AttackRanges[i] * multiplier
                     end
                 end
             end
             
-            -- Update enhanced hitbox size
-            local enhancedHitboxSize = attacking:FindFirstChild("EnhancedHitboxSize")
-            if enhancedHitboxSize then
-                local sizeMultiplier = ConfigLevels.Hitbox[EnhancedSettings.HitboxLevel]
-                enhancedHitboxSize.Value = Vector3.new(6 * sizeMultiplier, 6 * sizeMultiplier, 6 * sizeMultiplier)
-            end
-            
-            -- Apply dash modifications
-            local enhancedDash = attacking:FindFirstChild("EnhancedDash")
-            if enhancedDash then
+            -- Apply dash modifications directly
+            local dash = attacking:FindFirstChild("Dash")
+            if dash then
                 local multiplier = ConfigLevels.Knockback[EnhancedSettings.KnockbackPower]
                 for i = 1, 10 do
-                    local dash = enhancedDash:FindFirstChild(tostring(i))
-                    if dash and OriginalValues.DashValues[i] then
-                        dash.Value = OriginalValues.DashValues[i] * multiplier
+                    local dashValue = dash:FindFirstChild(tostring(i))
+                    if dashValue and OriginalValues.DashValues[i] then
+                        dashValue.Value = OriginalValues.DashValues[i] * multiplier
                     end
                 end
             end
         end
         
-        -- Apply damage modifications to enhanced folder
+        -- Apply damage modifications directly
         local damage = config:FindFirstChild("Damage")
         if damage then
-            local enhancedComboDamage = damage:FindFirstChild("EnhancedComboDamage")
-            if enhancedComboDamage then
+            local comboDamage = damage:FindFirstChild("ComboDamage")
+            if comboDamage then
                 local multiplier = ConfigLevels.Damage[EnhancedSettings.DamageLevel]
                 for i = 1, 10 do
-                    local dmg = enhancedComboDamage:FindFirstChild(tostring(i))
+                    local dmg = comboDamage:FindFirstChild(tostring(i))
                     if dmg and OriginalValues.ComboDamage[i] then
                         dmg.Value = OriginalValues.ComboDamage[i] * multiplier
                     end
                 end
             end
             
-            -- Apply critical hit modifications
+            -- Apply critical hit modifications directly
             local critConfig = ConfigLevels.Critical[EnhancedSettings.CriticalLevel]
             local critChance = damage:FindFirstChild("CriticalHitChance")
             if critChance then
@@ -387,14 +250,14 @@ local function applyEnhancements()
             end
         end
         
-        -- Apply knockback modifications to enhanced folder
+        -- Apply knockback modifications directly
         local knockback = config:FindFirstChild("Knockback")
         if knockback then
-            local enhancedKnockback = knockback:FindFirstChild("EnhancedComboKnockback")
-            if enhancedKnockback then
+            local comboKnockback = knockback:FindFirstChild("ComboKnockback")
+            if comboKnockback then
                 local multiplier = ConfigLevels.Knockback[EnhancedSettings.KnockbackPower]
                 for i = 1, 10 do
-                    local kb = enhancedKnockback:FindFirstChild(tostring(i))
+                    local kb = comboKnockback:FindFirstChild(tostring(i))
                     if kb and OriginalValues.ComboKnockback[i] then
                         kb.Value = OriginalValues.ComboKnockback[i] * multiplier
                     end
@@ -405,44 +268,24 @@ local function applyEnhancements()
         -- Apply blocking enhancements
         local blocking = config:FindFirstChild("Blocking")
         if blocking then
-            local enhancedBlock = blocking:FindFirstChild("EnhancedBlock")
-            if enhancedBlock then
-                local autoBlockRange = enhancedBlock:FindFirstChild("AutoBlockRange")
-                local blockEfficiency = enhancedBlock:FindFirstChild("BlockEfficiency")
-                local perfectBlock = enhancedBlock:FindFirstChild("PerfectBlock")
-                
-                if EnhancedSettings.BlockingMode == 1 then
-                    -- Enhanced blocking
-                    if blockEfficiency then blockEfficiency.Value = 0.85 end
-                elseif EnhancedSettings.BlockingMode == 2 then
-                    -- Auto blocking
-                    if autoBlockRange then autoBlockRange.Value = 15 end
-                    if blockEfficiency then blockEfficiency.Value = 0.90 end
-                elseif EnhancedSettings.BlockingMode == 3 then
-                    -- Perfect blocking
-                    if autoBlockRange then autoBlockRange.Value = 20 end
-                    if blockEfficiency then blockEfficiency.Value = 0.98 end
-                    if perfectBlock then perfectBlock.Value = true end
+            if EnhancedSettings.BlockingMode == 1 then
+                -- Enhanced blocking - better damage absorption
+                local damageAbsorption = blocking:FindFirstChild("DamageAbsorption")
+                if damageAbsorption then
+                    damageAbsorption.Value = 0.85
                 end
-            end
-        end
-    end)
-end
-
--- Make player enhanced by marking them
-local function makePlayerEnhanced()
-    safeCall(function()
-        local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
-        if not config then return end
-        
-        local enhancedUsers = config:FindFirstChild("EnhancedUsers")
-        if enhancedUsers then
-            local playerMarker = enhancedUsers:FindFirstChild(tostring(player.UserId))
-            if not playerMarker then
-                playerMarker = Instance.new("BoolValue")
-                playerMarker.Name = tostring(player.UserId)
-                playerMarker.Value = true
-                playerMarker.Parent = enhancedUsers
+            elseif EnhancedSettings.BlockingMode == 2 then
+                -- Auto blocking - will be handled in character enhancement
+                local damageAbsorption = blocking:FindFirstChild("DamageAbsorption")
+                if damageAbsorption then
+                    damageAbsorption.Value = 0.90
+                end
+            elseif EnhancedSettings.BlockingMode == 3 then
+                -- Perfect blocking
+                local damageAbsorption = blocking:FindFirstChild("DamageAbsorption")
+                if damageAbsorption then
+                    damageAbsorption.Value = 0.98
+                end
             end
         end
     end)
@@ -514,8 +357,12 @@ local function enhanceCharacter(character)
                     -- Reduced stun time
                     connections.stunConnection = stunned:GetPropertyChangedSignal("Value"):Connect(function()
                         if stunned.Value then
-                            task.wait(0.05) -- Mudança: wait() para task.wait()
-                            stunned.Value = false
+                            task.spawn(function()
+                                task.wait(0.05) -- Very short stun
+                                if stunned and stunned.Parent then
+                                    stunned.Value = false
+                                end
+                            end)
                         end
                     end)
                 elseif EnhancedSettings.StunResistance == 2 then
@@ -539,9 +386,13 @@ local function enhanceCharacter(character)
                     
                     connections.comboConnection = lastAttacked:GetPropertyChangedSignal("Value"):Connect(function()
                         if EnhancedSettings.ComboSpeed > 0 then
-                            task.wait(0.01) -- Mudança: wait() para task.wait()
-                            local resetTimes = {[1] = 3, [2] = 1, [3] = 0.1}
-                            lastAttacked.Value = tick() - resetTimes[EnhancedSettings.ComboSpeed]
+                            task.spawn(function()
+                                task.wait(0.01)
+                                local resetTimes = {[1] = 3, [2] = 1, [3] = 0.1}
+                                if lastAttacked and lastAttacked.Parent then
+                                    lastAttacked.Value = tick() - resetTimes[EnhancedSettings.ComboSpeed]
+                                end
+                            end)
                         end
                     end)
                 end
@@ -594,9 +445,16 @@ local function enhanceCharacter(character)
                         end
                     end
                     
-                    -- Auto block
-                    if EnhancedSettings.AutoFeatures == 2 or EnhancedSettings.AutoFeatures == 3 then
+                    -- Auto block (usando o sistema do jogo)
+                    if EnhancedSettings.AutoFeatures == 2 or EnhancedSettings.AutoFeatures == 3 or 
+                       EnhancedSettings.BlockingMode == 2 or EnhancedSettings.BlockingMode == 3 then
+                        
                         local shouldBlock = false
+                        local blockRange = 18
+                        
+                        if EnhancedSettings.BlockingMode == 3 then -- Perfect blocking
+                            blockRange = 25
+                        end
                         
                         for _, otherPlayer in pairs(Players:GetPlayers()) do
                             if otherPlayer ~= player and otherPlayer.Character then
@@ -609,7 +467,7 @@ local function enhanceCharacter(character)
                                         local otherAttacking = otherCombatState:FindFirstChild("Attacking")
                                         if otherAttacking and otherAttacking.Value then
                                             local distance = (rootPart.Position - otherRoot.Position).Magnitude
-                                            if distance < 18 then
+                                            if distance < blockRange then
                                                 shouldBlock = true
                                                 break
                                             end
@@ -619,9 +477,16 @@ local function enhanceCharacter(character)
                             end
                         end
                         
-                        local blocking = combatState:FindFirstChild("Blocking")
-                        if blocking then
-                            blocking.Value = shouldBlock
+                        -- Usar o sistema de bloqueio do jogo
+                        local events = ReplicatedStorage:FindFirstChild("Events")
+                        if events then
+                            local doBlock = events:FindFirstChild("DoBlock")
+                            if doBlock then
+                                local currentBlocking = combatState:FindFirstChild("Blocking")
+                                if currentBlocking and currentBlocking.Value ~= shouldBlock then
+                                    doBlock:FireServer(shouldBlock)
+                                end
+                            end
                         end
                     end
                 end)
@@ -649,7 +514,7 @@ local function createAdvancedGUI()
         local mainFrame = Instance.new("Frame")
         mainFrame.Name = "MainFrame"
         mainFrame.Size = UDim2.new(0, 400, 0, 500)
-        mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250) -- Centralizado
+        mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
         mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
         mainFrame.BorderSizePixel = 0
         mainFrame.Parent = screenGui
@@ -770,7 +635,7 @@ local function createAdvancedGUI()
             valueButton.TextColor3 = Color3.fromRGB(0, 255, 127)
             valueButton.TextScaled = true
             valueButton.Font = Enum.Font.Gotham
-            valueButton.Text = options[EnhancedSettings[settingKey] + 1] -- Correção: +1 para arrays base-1
+            valueButton.Text = options[EnhancedSettings[settingKey] + 1]
             valueButton.Parent = settingFrame
 
             local buttonCorner = Instance.new("UICorner")
@@ -786,11 +651,11 @@ local function createAdvancedGUI()
                 local currentValue = EnhancedSettings[settingKey]
                 local nextValue = (currentValue + 1) % #options
                 EnhancedSettings[settingKey] = nextValue
-                valueButton.Text = options[nextValue + 1] -- Correção: +1 para arrays base-1
+                valueButton.Text = options[nextValue + 1]
                 applyEnhancements()
                 if settingKey == "SpeedLevel" or settingKey == "StaminaMode" or 
                    settingKey == "StunResistance" or settingKey == "ComboSpeed" or 
-                   settingKey == "AutoFeatures" then
+                   settingKey == "AutoFeatures" or settingKey == "BlockingMode" then
                     enhanceCharacter(player.Character)
                 end
             end)
@@ -853,174 +718,191 @@ local function cleanup()
             local attacking = config:FindFirstChild("Attacking")
             if attacking then
                 local cooldowns = attacking:FindFirstChild("Cooldowns")
-                if cooldowns and OriginalValues.AttackCooldowns then
-                    for i, value in pairs(OriginalValues.AttackCooldowns) do
+                if cooldowns then
+                    for i = 1, 10 do
                         local cooldown = cooldowns:FindFirstChild(tostring(i))
-                        if cooldown then
-                            cooldown.Value = value
+                        if cooldown and OriginalValues.AttackCooldowns[i] then
+                            cooldown.Value = OriginalValues.AttackCooldowns[i]
                         end
                     end
                 end
-
+                
                 local ranges = attacking:FindFirstChild("Ranges")
-                if ranges and OriginalValues.AttackRanges then
-                    for i, value in pairs(OriginalValues.AttackRanges) do
+                if ranges then
+                    for i = 1, 10 do
                         local range = ranges:FindFirstChild(tostring(i))
-                        if range then
-                            range.Value = value
+                        if range and OriginalValues.AttackRanges[i] then
+                            range.Value = OriginalValues.AttackRanges[i]
                         end
                     end
                 end
-
+                
                 local dash = attacking:FindFirstChild("Dash")
-                if dash and OriginalValues.DashValues then
-                    for i, value in pairs(OriginalValues.DashValues) do
+                if dash then
+                    for i = 1, 10 do
                         local dashValue = dash:FindFirstChild(tostring(i))
-                        if dashValue then
-                            dashValue.Value = value
+                        if dashValue and OriginalValues.DashValues[i] then
+                            dashValue.Value = OriginalValues.DashValues[i]
                         end
                     end
                 end
             end
-
+            
             local damage = config:FindFirstChild("Damage")
             if damage then
                 local comboDamage = damage:FindFirstChild("ComboDamage")
-                if comboDamage and OriginalValues.ComboDamage then
-                    for i, value in pairs(OriginalValues.ComboDamage) do
+                if comboDamage then
+                    for i = 1, 10 do
                         local dmg = comboDamage:FindFirstChild(tostring(i))
-                        if dmg then
-                            dmg.Value = value
+                        if dmg and OriginalValues.ComboDamage[i] then
+                            dmg.Value = OriginalValues.ComboDamage[i]
                         end
                     end
                 end
-
+                
                 local critChance = damage:FindFirstChild("CriticalHitChance")
                 if critChance and OriginalValues.CritChance then
                     critChance.Value = OriginalValues.CritChance
                 end
-
+                
                 local critMultiplier = damage:FindFirstChild("CriticalHitMultiplier")
                 if critMultiplier and OriginalValues.CritMultiplier then
                     critMultiplier.Value = OriginalValues.CritMultiplier
                 end
             end
-
+            
             local knockback = config:FindFirstChild("Knockback")
             if knockback then
                 local comboKnockback = knockback:FindFirstChild("ComboKnockback")
-                if comboKnockback and OriginalValues.ComboKnockback then
-                    for i, value in pairs(OriginalValues.ComboKnockback) do
+                if comboKnockback then
+                    for i = 1, 10 do
                         local kb = comboKnockback:FindFirstChild(tostring(i))
-                        if kb then
-                            kb.Value = value
+                        if kb and OriginalValues.ComboKnockback[i] then
+                            kb.Value = OriginalValues.ComboKnockback[i]
                         end
                     end
                 end
             end
+        end
 
-            -- Remove enhanced folders
-            local enhancedFolders = {"CooldownsCombos", "RangesHitbox", "EnhancedHitboxSize", 
-                                    "EnhancedDash", "EnhancedComboDamage", "EnhancedComboKnockback", 
-                                    "EnhancedBlock", "EnhancedUsers"}
-            for _, folderName in ipairs(enhancedFolders) do
-                safeCall(function()
-                    -- Procurar em diferentes locais
-                    local folder = config:FindFirstChild(folderName)
-                    if folder then
-                        folder:Destroy()
-                    else
-                        -- Procurar dentro das subpastas
-                        local attacking = config:FindFirstChild("Attacking")
-                        if attacking then
-                            folder = attacking:FindFirstChild(folderName)
-                            if folder then folder:Destroy() end
-                        end
-                        
-                        local damage = config:FindFirstChild("Damage")
-                        if damage then
-                            folder = damage:FindFirstChild(folderName)
-                            if folder then folder:Destroy() end
-                        end
-                        
-                        local knockback = config:FindFirstChild("Knockback")
-                        if knockback then
-                            folder = knockback:FindFirstChild(folderName)
-                            if folder then folder:Destroy() end
-                        end
-                        
-                        local blocking = config:FindFirstChild("Blocking")
-                        if blocking then
-                            folder = blocking:FindFirstChild(folderName)
-                            if folder then folder:Destroy() end
-                        end
-                    end
-                end)
+        -- Reset character properties
+        if player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = 16 -- Reset to default speed
             end
         end
 
-        -- Reset GUI
-        local gui = playerGui:FindFirstChild("EnhancedCombatGUI")
-        if gui then
-            gui:Destroy()
+        -- Remove GUI
+        local existingGUI = playerGui:FindFirstChild("EnhancedCombatGUI")
+        if existingGUI then
+            existingGUI:Destroy()
         end
 
-        -- Reset character
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.WalkSpeed = 16
+        -- Reset settings to default
+        for setting, _ in pairs(EnhancedSettings) do
+            EnhancedSettings[setting] = 0
         end
     end)
 end
 
--- Initialize script
-local function initialize()
+-- Character added event
+local function onCharacterAdded(character)
+    if not character then return end
+    
+    task.wait(2) -- Wait for character to fully load
+    enhanceCharacter(character)
+end
+
+-- Player connection events
+connections.characterAddedConnection = player.CharacterAdded:Connect(onCharacterAdded)
+
+-- Handle current character if already spawned
+if player.Character then
+    onCharacterAdded(player.Character)
+end
+
+-- Monitor for configuration changes
+connections.configMonitor = RunService.Heartbeat:Connect(function()
+    local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
+    if config and next(OriginalValues) == nil then
+        backupOriginalValues()
+        applyEnhancements()
+    end
+end)
+
+-- Initialize system
+local function initializeSystem()
     safeCall(function()
-        -- Verificar se o ReplicatedStorage existe e tem a configuração necessária
-        if not ReplicatedStorage:FindFirstChild("CombatConfiguration") then
-            warn("CombatConfiguration não encontrada no ReplicatedStorage")
+        -- Wait for ReplicatedStorage to be ready
+        local config = waitForChild(ReplicatedStorage, "CombatConfiguration", 15)
+        if not config then
+            warn("Enhanced Combat System: Configuration not found!")
             return
         end
-        
-        -- Create and backup structures
-        createEnhancedStructure()
+
+        -- Backup original values
         backupOriginalValues()
         
         -- Apply initial enhancements
         applyEnhancements()
-        makePlayerEnhanced()
-        
-        -- Enhance current character
-        if player.Character then
-            enhanceCharacter(player.Character)
-        end
-        
-        -- Setup character added connection
-        connections.characterConnection = player.CharacterAdded:Connect(function(character)
-            -- Aguardar um pouco para o personagem carregar completamente
-            task.wait(1)
-            enhanceCharacter(character)
-        end)
         
         -- Create GUI
         createAdvancedGUI()
         
-        -- Setup cleanup on player removal
-        connections.playerConnection = Players.PlayerRemoving:Connect(function(leavingPlayer)
-            if leavingPlayer == player then
-                cleanup()
-            end
-        end)
+        -- Enhance current character if exists
+        if player.Character then
+            enhanceCharacter(player.Character)
+        end
         
-        print("Enhanced Combat System initialized successfully!")
+        print("Enhanced Combat System: Successfully initialized!")
+        print("Press 'P' to toggle GUI")
     end)
 end
 
--- Error handling and initialization
-local success, errorMsg = pcall(initialize)
-if not success then
-    warn("Enhanced Combat Script Failed to Initialize: " .. tostring(errorMsg))
-    cleanup()
+-- Auto-initialize after a short delay
+task.spawn(function()
+    task.wait(3)
+    initializeSystem()
+end)
+
+-- Manual initialization function (can be called externally)
+_G.InitializeEnhancedCombat = initializeSystem
+_G.CleanupEnhancedCombat = cleanup
+
+-- Game leaving cleanup
+game:BindToClose(cleanup)
+
+-- Player leaving cleanup  
+connections.playerRemoving = Players.PlayerRemoving:Connect(function(leavingPlayer)
+    if leavingPlayer == player then
+        cleanup()
+    end
+end)
+
+-- Status check function
+_G.EnhancedCombatStatus = function()
+    print("Enhanced Combat System Status:")
+    print("- Active Connections:", #connections)
+    print("- GUI Visible:", playerGui:FindFirstChild("EnhancedCombatGUI") and true or false)
+    print("- Original Values Backed Up:", next(OriginalValues) ~= nil)
+    print("- Current Settings:")
+    for setting, value in pairs(EnhancedSettings) do
+        print("  " .. setting .. ":", value)
+    end
 end
 
--- Return cleanup function for manual termination
-return cleanup
+-- Emergency reset function
+_G.EmergencyResetCombat = function()
+    cleanup()
+    task.wait(1)
+    initializeSystem()
+    print("Enhanced Combat System: Emergency reset completed!")
+end
+
+print("Enhanced Combat System: Script loaded! Initializing in 3 seconds...")
+print("Available commands:")
+print("- _G.InitializeEnhancedCombat() - Manual initialization")
+print("- _G.CleanupEnhancedCombat() - Clean shutdown")
+print("- _G.EnhancedCombatStatus() - Check system status")
+print("- _G.EmergencyResetCombat() - Emergency reset")
