@@ -9,7 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Enhanced Settings with complete control
+-- Enhanced Settings
 local EnhancedSettings = {
     CooldownLevel = 0,      -- 0=Normal, 1=Fast, 2=Ultra, 3=Instant
     HitboxLevel = 0,        -- 0=Normal, 1=Extended, 2=Wide, 3=Massive
@@ -29,7 +29,7 @@ local EnhancedSettings = {
 local ConfigLevels = {
     Cooldown = {
         [0] = 1.0,    -- Normal
-        [1] = 0.5,    -- 50% faster
+        [1] = 0.3,    -- 70% faster
         [2] = 0.1,    -- 90% faster  
         [3] = 0.01    -- Instant (99% faster)
     },
@@ -59,9 +59,9 @@ local ConfigLevels = {
     },
     Range = {
         [0] = 1.0,    -- Normal
-        [1] = 1.8,    -- Long
-        [2] = 2.8,    -- Extended
-        [3] = 4.5     -- Massive
+        [1] = 2.0,    -- Long
+        [2] = 3.0,    -- Extended
+        [3] = 5.0     -- Massive
     },
     Knockback = {
         [0] = 1.0,    -- Normal
@@ -178,7 +178,7 @@ local function backupOriginalValues()
     end)
 end
 
--- Apply enhanced configurations (agora trabalha diretamente com os valores originais)
+-- Apply enhanced configurations 
 local function applyEnhancements()
     safeCall(function()
         local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
@@ -186,7 +186,7 @@ local function applyEnhancements()
 
         local attacking = config:FindFirstChild("Attacking")
         if attacking then
-            -- Apply cooldown modifications directly
+            -- Apply cooldown modifications
             local cooldowns = attacking:FindFirstChild("Cooldowns")
             if cooldowns then
                 local multiplier = ConfigLevels.Cooldown[EnhancedSettings.CooldownLevel]
@@ -198,7 +198,7 @@ local function applyEnhancements()
                 end
             end
             
-            -- Apply range modifications directly
+            -- Apply range modifications
             local ranges = attacking:FindFirstChild("Ranges")
             if ranges then
                 local multiplier = ConfigLevels.Range[EnhancedSettings.RangeBoost]
@@ -210,7 +210,7 @@ local function applyEnhancements()
                 end
             end
             
-            -- Apply dash modifications directly
+            -- Apply dash modifications
             local dash = attacking:FindFirstChild("Dash")
             if dash then
                 local multiplier = ConfigLevels.Knockback[EnhancedSettings.KnockbackPower]
@@ -223,7 +223,7 @@ local function applyEnhancements()
             end
         end
         
-        -- Apply damage modifications directly
+        -- Apply damage modifications
         local damage = config:FindFirstChild("Damage")
         if damage then
             local comboDamage = damage:FindFirstChild("ComboDamage")
@@ -237,7 +237,7 @@ local function applyEnhancements()
                 end
             end
             
-            -- Apply critical hit modifications directly
+            -- Apply critical hit modifications
             local critConfig = ConfigLevels.Critical[EnhancedSettings.CriticalLevel]
             local critChance = damage:FindFirstChild("CriticalHitChance")
             if critChance then
@@ -250,7 +250,7 @@ local function applyEnhancements()
             end
         end
         
-        -- Apply knockback modifications directly
+        -- Apply knockback modifications
         local knockback = config:FindFirstChild("Knockback")
         if knockback then
             local comboKnockback = knockback:FindFirstChild("ComboKnockback")
@@ -269,29 +269,21 @@ local function applyEnhancements()
         local blocking = config:FindFirstChild("Blocking")
         if blocking then
             if EnhancedSettings.BlockingMode == 1 then
-                -- Enhanced blocking - better damage absorption
                 local damageAbsorption = blocking:FindFirstChild("DamageAbsorption")
                 if damageAbsorption then
                     damageAbsorption.Value = 0.85
                 end
-            elseif EnhancedSettings.BlockingMode == 2 then
-                -- Auto blocking - will be handled in character enhancement
+            elseif EnhancedSettings.BlockingMode >= 2 then
                 local damageAbsorption = blocking:FindFirstChild("DamageAbsorption")
                 if damageAbsorption then
-                    damageAbsorption.Value = 0.90
-                end
-            elseif EnhancedSettings.BlockingMode == 3 then
-                -- Perfect blocking
-                local damageAbsorption = blocking:FindFirstChild("DamageAbsorption")
-                if damageAbsorption then
-                    damageAbsorption.Value = 0.98
+                    damageAbsorption.Value = 0.95
                 end
             end
         end
     end)
 end
 
--- Character enhancements
+-- Character enhancements (NOVA ABORDAGEM)
 local function enhanceCharacter(character)
     if not character then return end
     
@@ -320,6 +312,33 @@ local function enhanceCharacter(character)
         end
 
         if combatState then
+            -- NOVA ABORDAGEM: Manipular AttackCooldown diretamente
+            if EnhancedSettings.CooldownLevel > 0 then
+                if connections.cooldownConnection then
+                    connections.cooldownConnection:Disconnect()
+                end
+                
+                connections.cooldownConnection = combatState.AttackCooldown:GetPropertyChangedSignal("Value"):Connect(function()
+                    if EnhancedSettings.CooldownLevel > 0 and combatState.AttackCooldown.Value == true then
+                        local cooldownMultiplier = ConfigLevels.Cooldown[EnhancedSettings.CooldownLevel]
+                        task.spawn(function()
+                            if EnhancedSettings.CooldownLevel == 3 then
+                                -- Instant mode
+                                task.wait(0.01)
+                            else
+                                -- Calculate based on original cooldown
+                                local originalCooldown = 0.5 -- Default cooldown estimate
+                                task.wait(originalCooldown * cooldownMultiplier)
+                            end
+                            
+                            if combatState.AttackCooldown.Value == true then
+                                combatState.AttackCooldown.Value = false
+                            end
+                        end)
+                    end
+                end)
+            end
+            
             -- Stamina management
             local stamina = combatState:FindFirstChild("Stamina")
             if stamina then
@@ -417,7 +436,7 @@ local function enhanceCharacter(character)
                         for _, otherPlayer in pairs(Players:GetPlayers()) do
                             if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
                                 local distance = (rootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
-                                if distance < 18 and distance < nearestDistance then
+                                if distance < 20 and distance < nearestDistance then
                                     nearestDistance = distance
                                     nearestTarget = otherPlayer.Character
                                 end
@@ -445,16 +464,12 @@ local function enhanceCharacter(character)
                         end
                     end
                     
-                    -- Auto block (usando o sistema do jogo)
+                    -- Auto block
                     if EnhancedSettings.AutoFeatures == 2 or EnhancedSettings.AutoFeatures == 3 or 
-                       EnhancedSettings.BlockingMode == 2 or EnhancedSettings.BlockingMode == 3 then
+                       EnhancedSettings.BlockingMode >= 2 then
                         
                         local shouldBlock = false
-                        local blockRange = 18
-                        
-                        if EnhancedSettings.BlockingMode == 3 then -- Perfect blocking
-                            blockRange = 25
-                        end
+                        local blockRange = 20
                         
                         for _, otherPlayer in pairs(Players:GetPlayers()) do
                             if otherPlayer ~= player and otherPlayer.Character then
@@ -477,7 +492,6 @@ local function enhanceCharacter(character)
                             end
                         end
                         
-                        -- Usar o sistema de bloqueio do jogo
                         local events = ReplicatedStorage:FindFirstChild("Events")
                         if events then
                             local doBlock = events:FindFirstChild("DoBlock")
@@ -495,22 +509,19 @@ local function enhanceCharacter(character)
     end)
 end
 
--- Create Advanced GUI
+-- Create Advanced GUI (mesmo código anterior)
 local function createAdvancedGUI()
     safeCall(function()
-        -- Remove existing GUI if it exists
         local existingGUI = playerGui:FindFirstChild("EnhancedCombatGUI")
         if existingGUI then
             existingGUI:Destroy()
         end
 
-        -- Main GUI container
         local screenGui = Instance.new("ScreenGui")
         screenGui.Name = "EnhancedCombatGUI"
         screenGui.Parent = playerGui
         screenGui.ResetOnSpawn = false
 
-        -- Main Frame
         local mainFrame = Instance.new("Frame")
         mainFrame.Name = "MainFrame"
         mainFrame.Size = UDim2.new(0, 400, 0, 500)
@@ -519,7 +530,6 @@ local function createAdvancedGUI()
         mainFrame.BorderSizePixel = 0
         mainFrame.Parent = screenGui
 
-        -- Make GUI draggable
         local dragging = false
         local dragStart = nil
         local startPos = nil
@@ -545,18 +555,15 @@ local function createAdvancedGUI()
             end
         end)
 
-        -- Add rounded corners
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 12)
         corner.Parent = mainFrame
 
-        -- Add border
         local stroke = Instance.new("UIStroke")
         stroke.Color = Color3.fromRGB(0, 255, 127)
         stroke.Thickness = 2
         stroke.Parent = mainFrame
 
-        -- Header Frame
         local headerFrame = Instance.new("Frame")
         headerFrame.Name = "HeaderFrame"
         headerFrame.Size = UDim2.new(1, 0, 0, 80)
@@ -569,20 +576,18 @@ local function createAdvancedGUI()
         headerCorner.CornerRadius = UDim.new(0, 12)
         headerCorner.Parent = headerFrame
 
-        -- Title Label
         local titleLabel = Instance.new("TextLabel")
         titleLabel.Name = "TitleLabel"
         titleLabel.Size = UDim2.new(1, -60, 1, 0)
         titleLabel.Position = UDim2.new(0, 15, 0, 0)
         titleLabel.BackgroundTransparency = 1
-        titleLabel.Text = "Enhanced Combat System"
+        titleLabel.Text = "Enhanced Combat System v2.0"
         titleLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
         titleLabel.TextScaled = true
         titleLabel.Font = Enum.Font.GothamBold
         titleLabel.TextXAlignment = Enum.TextXAlignment.Left
         titleLabel.Parent = headerFrame
 
-        -- Close Button
         local closeButton = Instance.new("TextButton")
         closeButton.Name = "CloseButton"
         closeButton.Size = UDim2.new(0, 50, 0, 50)
@@ -594,7 +599,6 @@ local function createAdvancedGUI()
         closeButton.Font = Enum.Font.GothamBold
         closeButton.Parent = headerFrame
 
-        -- Settings Container
         local settingsContainer = Instance.new("ScrollingFrame")
         settingsContainer.Name = "SettingsContainer"
         settingsContainer.Size = UDim2.new(1, -20, 1, -100)
@@ -610,7 +614,6 @@ local function createAdvancedGUI()
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Parent = settingsContainer
 
-        -- Create setting control
         local function createSettingControl(name, settingKey, options)
             local settingFrame = Instance.new("Frame")
             settingFrame.Size = UDim2.new(1, 0, 0, 60)
@@ -653,17 +656,12 @@ local function createAdvancedGUI()
                 EnhancedSettings[settingKey] = nextValue
                 valueButton.Text = options[nextValue + 1]
                 applyEnhancements()
-                if settingKey == "SpeedLevel" or settingKey == "StaminaMode" or 
-                   settingKey == "StunResistance" or settingKey == "ComboSpeed" or 
-                   settingKey == "AutoFeatures" or settingKey == "BlockingMode" then
-                    enhanceCharacter(player.Character)
-                end
+                enhanceCharacter(player.Character)
             end)
 
             return settingFrame
         end
 
-        -- Create all settings controls
         local settingOptions = {
             CooldownLevel = {"Normal", "Fast", "Ultra", "Instant"},
             HitboxLevel = {"Normal", "Extended", "Wide", "Massive"},
@@ -789,7 +787,7 @@ local function cleanup()
         if player.Character then
             local humanoid = player.Character:FindFirstChild("Humanoid")
             if humanoid then
-                humanoid.WalkSpeed = 16 -- Reset to default speed
+                humanoid.WalkSpeed = 16
             end
         end
 
@@ -810,7 +808,7 @@ end
 local function onCharacterAdded(character)
     if not character then return end
     
-    task.wait(2) -- Wait for character to fully load
+    task.wait(2)
     enhanceCharacter(character)
 end
 
@@ -822,11 +820,14 @@ if player.Character then
     onCharacterAdded(player.Character)
 end
 
--- Monitor for configuration changes
+-- Monitor for configuration changes with continuous updates
 connections.configMonitor = RunService.Heartbeat:Connect(function()
     local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
-    if config and next(OriginalValues) == nil then
-        backupOriginalValues()
+    if config then
+        if next(OriginalValues) == nil then
+            backupOriginalValues()
+        end
+        -- Continuously apply enhancements to override server changes
         applyEnhancements()
     end
 end)
@@ -834,55 +835,48 @@ end)
 -- Initialize system
 local function initializeSystem()
     safeCall(function()
-        -- Wait for ReplicatedStorage to be ready
         local config = waitForChild(ReplicatedStorage, "CombatConfiguration", 15)
         if not config then
-            warn("Enhanced Combat System: Configuration not found!")
+            warn("Enhanced Combat System v2.0: Configuration not found!")
             return
         end
 
-        -- Backup original values
         backupOriginalValues()
-        
-        -- Apply initial enhancements
         applyEnhancements()
-        
-        -- Create GUI
         createAdvancedGUI()
         
-        -- Enhance current character if exists
         if player.Character then
             enhanceCharacter(player.Character)
         end
         
-        print("Enhanced Combat System: Successfully initialized!")
+        print("Enhanced Combat System v2.0: Successfully initialized!")
         print("Press 'P' to toggle GUI")
+        print("New features: Direct cooldown manipulation, continuous updates")
     end)
 end
 
--- Auto-initialize after a short delay
+-- Auto-initialize
 task.spawn(function()
     task.wait(3)
     initializeSystem()
 end)
 
--- Manual initialization function (can be called externally)
+-- Global functions
 _G.InitializeEnhancedCombat = initializeSystem
 _G.CleanupEnhancedCombat = cleanup
 
--- Game leaving cleanup
+-- Game cleanup
 game:BindToClose(cleanup)
 
--- Player leaving cleanup  
 connections.playerRemoving = Players.PlayerRemoving:Connect(function(leavingPlayer)
     if leavingPlayer == player then
         cleanup()
     end
 end)
 
--- Status check function
+-- Status and emergency functions
 _G.EnhancedCombatStatus = function()
-    print("Enhanced Combat System Status:")
+    print("Enhanced Combat System v2.0 Status:")
     print("- Active Connections:", #connections)
     print("- GUI Visible:", playerGui:FindFirstChild("EnhancedCombatGUI") and true or false)
     print("- Original Values Backed Up:", next(OriginalValues) ~= nil)
@@ -890,19 +884,50 @@ _G.EnhancedCombatStatus = function()
     for setting, value in pairs(EnhancedSettings) do
         print("  " .. setting .. ":", value)
     end
+    
+    -- Show current config values
+    local config = ReplicatedStorage:FindFirstChild("CombatConfiguration")
+    if config then
+        print("- Current Config Values:")
+        local attacking = config:FindFirstChild("Attacking")
+        if attacking then
+            local cooldowns = attacking:FindFirstChild("Cooldowns")
+            if cooldowns then
+                for i = 1, 3 do
+                    local cooldown = cooldowns:FindFirstChild(tostring(i))
+                    if cooldown then
+                        print("  Cooldown " .. i .. ":", cooldown.Value)
+                    end
+                end
+            end
+        end
+    end
 end
 
--- Emergency reset function
 _G.EmergencyResetCombat = function()
     cleanup()
     task.wait(1)
     initializeSystem()
-    print("Enhanced Combat System: Emergency reset completed!")
+    print("Enhanced Combat System v2.0: Emergency reset completed!")
 end
 
-print("Enhanced Combat System: Script loaded! Initializing in 3 seconds...")
+-- Force update function
+_G.ForceUpdateCombat = function()
+    applyEnhancements()
+    if player.Character then
+        enhanceCharacter(player.Character)
+    end
+    print("Enhanced Combat System v2.0: Force update completed!")
+end
+
+print("Enhanced Combat System v2.0: Script loaded!")
+print("Key improvements:")
+print("- Direct AttackCooldown manipulation")
+print("- Continuous configuration updates") 
+print("- Better server override protection")
 print("Available commands:")
 print("- _G.InitializeEnhancedCombat() - Manual initialization")
 print("- _G.CleanupEnhancedCombat() - Clean shutdown")
 print("- _G.EnhancedCombatStatus() - Check system status")
 print("- _G.EmergencyResetCombat() - Emergency reset")
+print("- _G.ForceUpdateCombat() - Force update all settings")
