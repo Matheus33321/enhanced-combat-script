@@ -11,7 +11,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- Configurações das melhorias
 local enhancements = {
-    reducedCooldown = false,
+    noCooldown = false,
     expandedHitbox = false,
     optimizedAttack = false,
     infiniteStamina = false,
@@ -19,11 +19,15 @@ local enhancements = {
     speedBoost = false,
     jumpBoost = false,
     noStun = false,
-    reachExtender = false
+    reachExtender = false,
+    customBlockKey = false
 }
 
 -- Valores originais para restauração
 local originalValues = {}
+
+-- Configuração de tecla personalizada para defesa
+local customBlockKeyCode = Enum.KeyCode.V -- Tecla padrão (pode ser alterada)
 
 -- Função para criar a GUI
 local function createGUI()
@@ -102,7 +106,7 @@ local function createGUI()
     scrollFrame.BorderSizePixel = 0
     scrollFrame.ScrollBarThickness = 6
     scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 720) -- Aumentado para 9 opções
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 800) -- Aumentado para 10 opções
     scrollFrame.Parent = mainFrame
 
     -- Layout das opções
@@ -193,15 +197,16 @@ local function createGUI()
     end
 
     -- Criar toggles
-    createToggle("reducedCooldown", "🚀 Cooldown Reduzido", "Reduz significativamente o tempo de cooldown entre ataques", 1)
+    createToggle("noCooldown", "⚡ Sem Cooldown", "Remove COMPLETAMENTE o cooldown de ataques e defesa", 1)
     createToggle("expandedHitbox", "📦 Hitbox Expandida", "Aumenta o alcance e área de ataque dos golpes", 2)
-    createToggle("optimizedAttack", "⚡ Ataque Otimizado", "Melhora a velocidade e precisão dos ataques", 3)
+    createToggle("optimizedAttack", "🚀 Ataque Otimizado", "Melhora a velocidade e precisão dos ataques", 3)
     createToggle("infiniteStamina", "♾️ Stamina Infinita", "Remove o consumo de stamina para ataques", 4)
     createToggle("autoCombo", "🔄 Auto Combo", "Automatiza a sequência de combos", 5)
     createToggle("speedBoost", "💨 Boost de Velocidade", "Aumenta a velocidade de movimento", 6)
     createToggle("jumpBoost", "🦘 Boost de Pulo", "Aumenta a altura dos pulos", 7)
     createToggle("noStun", "🛡️ Anti-Stun", "Previne que o jogador seja atordoado", 8)
     createToggle("reachExtender", "🎯 Reach Extendido", "Aumenta significativamente o alcance dos ataques", 9)
+    createToggle("customBlockKey", "🔧 Tecla de Defesa", "Permite usar qualquer tecla para defender (padrão: V)", 10)
 
     -- Botões de ação
     local buttonFrame = Instance.new("Frame")
@@ -323,32 +328,61 @@ function applyEnhancement(name, enabled)
     local humanoid = character:FindFirstChild("Humanoid")
     local combatState = humanoid and humanoid:FindFirstChild("CombatState")
     
-    if name == "reducedCooldown" then
+    if name == "noCooldown" then
         if combatState then
             if enabled then
-                -- Hook para reduzir cooldown interceptando o AttackCooldown
-                if not originalValues.cooldownLoop then
-                    originalValues.cooldownLoop = RunService.Heartbeat:Connect(function()
-                        if enhancements.reducedCooldown and combatState:FindFirstChild("AttackCooldown") then
-                            -- Força o cooldown a terminar mais rápido
-                            if combatState.AttackCooldown.Value == true then
+                -- REMOVE COMPLETAMENTE qualquer cooldown
+                if not originalValues.noCooldownLoop then
+                    originalValues.noCooldownLoop = RunService.Heartbeat:Connect(function()
+                        if enhancements.noCooldown and combatState then
+                            -- Força todos os cooldowns para false instantaneamente
+                            if combatState:FindFirstChild("AttackCooldown") then
+                                combatState.AttackCooldown.Value = false
+                            end
+                            if combatState:FindFirstChild("Attacking") and combatState.Attacking.Value == true then
+                                -- Permite ataques simultâneos removendo a trava
                                 task.spawn(function()
-                                    wait(0.1) -- Cooldown super reduzido
-                                    if combatState.AttackCooldown then
-                                        combatState.AttackCooldown.Value = false
+                                    wait(0.05) -- Mínimo para evitar crashes
+                                    if combatState.Attacking then
+                                        combatState.Attacking.Value = false
                                     end
+                                end)
+                            end
+                            -- Remove qualquer limitação de último ataque
+                            if combatState:FindFirstChild("LastAttacked") then
+                                combatState.LastAttacked.Value = 0
+                            end
+                        end
+                    end)
+                end
+                
+                -- Hook para interceptar e anular qualquer sistema de cooldown do servidor
+                if not originalValues.serverCooldownHook then
+                    originalValues.serverCooldownHook = RunService.Heartbeat:Connect(function()
+                        if enhancements.noCooldown then
+                            -- Spamming de ataques para forçar o servidor a processar
+                            local rs = game:GetService("ReplicatedStorage")
+                            if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoAttack") then
+                                -- Permite múltiplos ataques por frame
+                                pcall(function()
+                                    rs.Events.DoAttack:FireServer()
                                 end)
                             end
                         end
                     end)
                 end
-                print("✅ Cooldown reduzido ativado!")
+                
+                print("✅ COOLDOWN COMPLETAMENTE REMOVIDO!")
             else
-                if originalValues.cooldownLoop then
-                    originalValues.cooldownLoop:Disconnect()
-                    originalValues.cooldownLoop = nil
+                if originalValues.noCooldownLoop then
+                    originalValues.noCooldownLoop:Disconnect()
+                    originalValues.noCooldownLoop = nil
                 end
-                print("❌ Cooldown reduzido desativado!")
+                if originalValues.serverCooldownHook then
+                    originalValues.serverCooldownHook:Disconnect()
+                    originalValues.serverCooldownHook = nil
+                end
+                print("❌ Sistema de cooldown restaurado!")
             end
         end
         
@@ -360,7 +394,7 @@ function applyEnhancement(name, enabled)
                 if not originalValues.expandedHitbox then
                     local expandedPart = Instance.new("Part")
                     expandedPart.Name = "ExpandedHitbox"
-                    expandedPart.Size = rootPart.Size * 3 -- Hitbox 3x maior
+                    expandedPart.Size = rootPart.Size * 5 -- Hitbox 5x maior agora
                     expandedPart.CFrame = rootPart.CFrame
                     expandedPart.Anchored = false
                     expandedPart.CanCollide = false
@@ -376,16 +410,11 @@ function applyEnhancement(name, enabled)
                     expandedPart.Parent = character
                     originalValues.expandedHitbox = expandedPart
                     
-                    -- Substituir o rootPart.Size temporariamente para cálculos de hitbox
-                    originalValues.originalSize = rootPart.Size
-                    print("✅ Hitbox expandida ativada!")
+                    print("✅ Hitbox expandida 5x ativada!")
                 end
             elseif originalValues.expandedHitbox then
                 originalValues.expandedHitbox:Destroy()
                 originalValues.expandedHitbox = nil
-                if originalValues.originalSize and rootPart then
-                    -- Restaurar tamanho original se necessário
-                end
                 print("❌ Hitbox expandida desativada!")
             end
         end
@@ -393,22 +422,24 @@ function applyEnhancement(name, enabled)
     elseif name == "optimizedAttack" then
         if combatState then
             if enabled then
-                -- Hook para otimizar ataques
+                -- Sistema de ataque ultra otimizado
                 if not originalValues.optimizedLoop then
                     originalValues.optimizedLoop = RunService.Heartbeat:Connect(function()
                         if enhancements.optimizedAttack and combatState then
-                            -- Força ataques mais rápidos removendo algumas verificações
-                            if combatState:FindFirstChild("Attacking") and combatState.Attacking.Value == false then
-                                -- Remove temporariamente o estado de "já atacando" mais rapidamente
-                                if combatState:FindFirstChild("LastAttacked") then
-                                    -- Acelera a disponibilização do próximo ataque
-                                    combatState.LastAttacked.Value = combatState.LastAttacked.Value + 0.1
-                                end
+                            -- Remove limitações de combo
+                            if combatState:FindFirstChild("Combo") then
+                                -- Mantém combo sempre no máximo para maior dano
+                                combatState.Combo.Value = math.max(combatState.Combo.Value, 3)
+                            end
+                            
+                            -- Força ataques mais rápidos
+                            if combatState:FindFirstChild("LastAttacked") then
+                                combatState.LastAttacked.Value = tick() - 10 -- Força combo disponível
                             end
                         end
                     end)
                 end
-                print("✅ Ataque otimizado ativado!")
+                print("✅ Ataque ultra otimizado ativado!")
             else
                 if originalValues.optimizedLoop then
                     originalValues.optimizedLoop:Disconnect()
@@ -597,6 +628,65 @@ function applyEnhancement(name, enabled)
                 end
                 print("❌ Reach extendido desativado!")
             end
+        end
+        
+    elseif name == "customBlockKey" then
+        if enabled then
+            -- Sistema de tecla personalizada para defesa
+            if not originalValues.customBlockConnection then
+                print("🔧 Sistema de defesa personalizado ativado!")
+                print("💡 Pressione 'P' para alterar a tecla de defesa")
+                print("🛡️ Tecla atual: " .. customBlockKeyCode.Name)
+                
+                -- Conexão para alterar a tecla
+                originalValues.keyChangeConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                    if not gameProcessed and input.KeyCode == Enum.KeyCode.P and enhancements.customBlockKey then
+                        print("🔧 Digite o nome da nova tecla (ex: V, B, X, etc.):")
+                        -- Aguarda próxima tecla pressionada
+                        local connection
+                        connection = UserInputService.InputBegan:Connect(function(newInput, newGameProcessed)
+                            if not newGameProcessed and newInput.KeyCode ~= Enum.KeyCode.P then
+                                customBlockKeyCode = newInput.KeyCode
+                                print("✅ Nova tecla de defesa definida: " .. customBlockKeyCode.Name)
+                                connection:Disconnect()
+                            end
+                        end)
+                    end
+                end)
+                
+                -- Sistema de defesa personalizado
+                originalValues.customBlockConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                    if not gameProcessed and input.KeyCode == customBlockKeyCode and enhancements.customBlockKey then
+                        local rs = game:GetService("ReplicatedStorage")
+                        if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoBlock") then
+                            rs.Events.DoBlock:FireServer(true)
+                        end
+                    end
+                end)
+                
+                originalValues.customBlockConnectionEnd = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+                    if not gameProcessed and input.KeyCode == customBlockKeyCode and enhancements.customBlockKey then
+                        local rs = game:GetService("ReplicatedStorage")
+                        if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoBlock") then
+                            rs.Events.DoBlock:FireServer(false)
+                        end
+                    end
+                end)
+            end
+        else
+            if originalValues.customBlockConnection then
+                originalValues.customBlockConnection:Disconnect()
+                originalValues.customBlockConnection = nil
+            end
+            if originalValues.customBlockConnectionEnd then
+                originalValues.customBlockConnectionEnd:Disconnect()
+                originalValues.customBlockConnectionEnd = nil
+            end
+            if originalValues.keyChangeConnection then
+                originalValues.keyChangeConnection:Disconnect()
+                originalValues.keyChangeConnection = nil
+            end
+            print("❌ Sistema de defesa personalizado desativado!")
         end
     end
 end
