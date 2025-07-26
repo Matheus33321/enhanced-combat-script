@@ -1,6 +1,3 @@
--- Enhanced Combat Script v3.0 - Complete Edition
--- Execute: loadstring(game:HttpGet("https://raw.githubusercontent.com/Matheus33321/enhanced-combat-script/main/enhanced_combat.lua"))()
-
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -92,7 +89,7 @@ local function waitForChild(parent, childName, timeout)
     timeout = timeout or 10
     
     while not parent:FindFirstChild(childName) and tick() - startTime < timeout do
-        wait(0.1)
+        task.wait(0.1) -- Mudança: wait() para task.wait()
     end
     
     return parent:FindFirstChild(childName)
@@ -517,7 +514,7 @@ local function enhanceCharacter(character)
                     -- Reduced stun time
                     connections.stunConnection = stunned:GetPropertyChangedSignal("Value"):Connect(function()
                         if stunned.Value then
-                            wait(0.05) -- Very short stun
+                            task.wait(0.05) -- Mudança: wait() para task.wait()
                             stunned.Value = false
                         end
                     end)
@@ -542,7 +539,7 @@ local function enhanceCharacter(character)
                     
                     connections.comboConnection = lastAttacked:GetPropertyChangedSignal("Value"):Connect(function()
                         if EnhancedSettings.ComboSpeed > 0 then
-                            wait(0.01)
+                            task.wait(0.01) -- Mudança: wait() para task.wait()
                             local resetTimes = {[1] = 3, [2] = 1, [3] = 0.1}
                             lastAttacked.Value = tick() - resetTimes[EnhancedSettings.ComboSpeed]
                         end
@@ -633,122 +630,209 @@ local function enhanceCharacter(character)
     end)
 end
 
--- Continue createAdvancedGUI function
+-- Create Advanced GUI
 local function createAdvancedGUI()
-    -- [Previous GUI code remains unchanged until closeButton creation]
+    safeCall(function()
+        -- Remove existing GUI if it exists
+        local existingGUI = playerGui:FindFirstChild("EnhancedCombatGUI")
+        if existingGUI then
+            existingGUI:Destroy()
+        end
 
-    closeButton.Size = UDim2.new(0, 50, 0, 50)
-    closeButton.Position = UDim2.new(1, -60, 0, 15)
-    closeButton.BackgroundTransparency = 1
-    closeButton.Text = "✖"
-    closeButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-    closeButton.TextScaled = true
-    closeButton.Font = Enum.Font.GothamBold
-    closeButton.Parent = headerFrame
+        -- Main GUI container
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "EnhancedCombatGUI"
+        screenGui.Parent = playerGui
+        screenGui.ResetOnSpawn = false
 
-    -- Settings Container
-    local settingsContainer = Instance.new("ScrollingFrame")
-    settingsContainer.Name = "SettingsContainer"
-    settingsContainer.Size = UDim2.new(1, -20, 1, -100)
-    settingsContainer.Position = UDim2.new(0, 10, 0, 90)
-    settingsContainer.BackgroundTransparency = 1
-    settingsContainer.ScrollBarThickness = 8
-    settingsContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 127)
-    settingsContainer.CanvasSize = UDim2.new(0, 0, 0, 900)
-    settingsContainer.Parent = mainFrame
+        -- Main Frame
+        local mainFrame = Instance.new("Frame")
+        mainFrame.Name = "MainFrame"
+        mainFrame.Size = UDim2.new(0, 400, 0, 500)
+        mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250) -- Centralizado
+        mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+        mainFrame.BorderSizePixel = 0
+        mainFrame.Parent = screenGui
 
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 10)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = settingsContainer
+        -- Make GUI draggable
+        local dragging = false
+        local dragStart = nil
+        local startPos = nil
 
-    -- Create setting control
-    local function createSettingControl(name, settingKey, options)
-        local settingFrame = Instance.new("Frame")
-        settingFrame.Size = UDim2.new(1, 0, 0, 60)
-        settingFrame.BackgroundTransparency = 1
-        settingFrame.LayoutOrder = #settingsContainer:GetChildren()
-        settingFrame.Parent = settingsContainer
-
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0.4, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = name
-        label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        label.TextScaled = true
-        label.Font = Enum.Font.Gotham
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = settingFrame
-
-        local valueButton = Instance.new("TextButton")
-        valueButton.Size = UDim2.new(0.55, 0, 0.8, 0)
-        valueButton.Position = UDim2.new(0.45, 0, 0.1, 0)
-        valueButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-        valueButton.TextColor3 = Color3.fromRGB(0, 255, 127)
-        valueButton.TextScaled = true
-        valueButton.Font = Enum.Font.Gotham
-        valueButton.Text = options[EnhancedSettings[settingKey]]
-        valueButton.Parent = settingFrame
-
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 8)
-        corner.Parent = valueButton
-
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0, 255, 127)
-        stroke.Thickness = 1
-        stroke.Parent = valueButton
-
-        valueButton.MouseButton1Click:Connect(function()
-            local currentValue = EnhancedSettings[settingKey]
-            local nextValue = (currentValue + 1) % #options
-            EnhancedSettings[settingKey] = nextValue
-            valueButton.Text = options[nextValue]
-            applyEnhancements()
-            if settingKey == "SpeedLevel" or settingKey == "StaminaMode" or 
-               settingKey == "StunResistance" or settingKey == "ComboSpeed" or 
-               settingKey == "AutoFeatures" then
-                enhanceCharacter(player.Character)
+        mainFrame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = mainFrame.Position
             end
         end)
 
-        return settingFrame
-    end
+        mainFrame.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+                local delta = input.Position - dragStart
+                mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
 
-    -- Create all settings controls
-    local settingOptions = {
-        CooldownLevel = {"Normal", "Fast", "Ultra", "Instant"},
-        HitboxLevel = {"Normal", "Extended", "Wide", "Massive"},
-        BlockingMode = {"Normal", "Enhanced", "Auto", "Perfect"},
-        DamageLevel = {"Normal", "Boosted", "High", "Extreme"},
-        SpeedLevel = {"Normal", "Fast", "Sonic", "Flash"},
-        StaminaMode = {"Normal", "Extended", "Infinite"},
-        StunResistance = {"Normal", "Reduced", "Immune"},
-        CriticalLevel = {"Normal", "Lucky", "Critical", "Destroyer"},
-        ComboSpeed = {"Normal", "Fast", "Rapid", "Lightning"},
-        AutoFeatures = {"Off", "Attack", "Block", "Both"},
-        RangeBoost = {"Normal", "Long", "Extended", "Massive"},
-        KnockbackPower = {"Normal", "Strong", "Powerful", "Devastating"}
-    }
+        mainFrame.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
 
-    for settingName, options in pairs(settingOptions) do
-        createSettingControl(settingName:gsub("([A-Z])", " %1"):gsub("^%s", ""), settingName, options)
-    end
+        -- Add rounded corners
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 12)
+        corner.Parent = mainFrame
 
-    -- Toggle GUI visibility
-    local isVisible = true
-    closeButton.MouseButton1Click:Connect(function()
-        isVisible = not isVisible
-        mainFrame.Visible = isVisible
-    end)
+        -- Add border
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0, 255, 127)
+        stroke.Thickness = 2
+        stroke.Parent = mainFrame
 
-    -- Hotkey to toggle GUI
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.P then
+        -- Header Frame
+        local headerFrame = Instance.new("Frame")
+        headerFrame.Name = "HeaderFrame"
+        headerFrame.Size = UDim2.new(1, 0, 0, 80)
+        headerFrame.Position = UDim2.new(0, 0, 0, 0)
+        headerFrame.BackgroundColor3 = Color3.fromRGB(0, 255, 127)
+        headerFrame.BorderSizePixel = 0
+        headerFrame.Parent = mainFrame
+
+        local headerCorner = Instance.new("UICorner")
+        headerCorner.CornerRadius = UDim.new(0, 12)
+        headerCorner.Parent = headerFrame
+
+        -- Title Label
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Name = "TitleLabel"
+        titleLabel.Size = UDim2.new(1, -60, 1, 0)
+        titleLabel.Position = UDim2.new(0, 15, 0, 0)
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Text = "Enhanced Combat System"
+        titleLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+        titleLabel.TextScaled = true
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        titleLabel.Parent = headerFrame
+
+        -- Close Button
+        local closeButton = Instance.new("TextButton")
+        closeButton.Name = "CloseButton"
+        closeButton.Size = UDim2.new(0, 50, 0, 50)
+        closeButton.Position = UDim2.new(1, -60, 0, 15)
+        closeButton.BackgroundTransparency = 1
+        closeButton.Text = "✖"
+        closeButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+        closeButton.TextScaled = true
+        closeButton.Font = Enum.Font.GothamBold
+        closeButton.Parent = headerFrame
+
+        -- Settings Container
+        local settingsContainer = Instance.new("ScrollingFrame")
+        settingsContainer.Name = "SettingsContainer"
+        settingsContainer.Size = UDim2.new(1, -20, 1, -100)
+        settingsContainer.Position = UDim2.new(0, 10, 0, 90)
+        settingsContainer.BackgroundTransparency = 1
+        settingsContainer.ScrollBarThickness = 8
+        settingsContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 127)
+        settingsContainer.CanvasSize = UDim2.new(0, 0, 0, 900)
+        settingsContainer.Parent = mainFrame
+
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 10)
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = settingsContainer
+
+        -- Create setting control
+        local function createSettingControl(name, settingKey, options)
+            local settingFrame = Instance.new("Frame")
+            settingFrame.Size = UDim2.new(1, 0, 0, 60)
+            settingFrame.BackgroundTransparency = 1
+            settingFrame.LayoutOrder = #settingsContainer:GetChildren()
+            settingFrame.Parent = settingsContainer
+
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(0.4, 0, 1, 0)
+            label.BackgroundTransparency = 1
+            label.Text = name
+            label.TextColor3 = Color3.fromRGB(255, 255, 255)
+            label.TextScaled = true
+            label.Font = Enum.Font.Gotham
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Parent = settingFrame
+
+            local valueButton = Instance.new("TextButton")
+            valueButton.Size = UDim2.new(0.55, 0, 0.8, 0)
+            valueButton.Position = UDim2.new(0.45, 0, 0.1, 0)
+            valueButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            valueButton.TextColor3 = Color3.fromRGB(0, 255, 127)
+            valueButton.TextScaled = true
+            valueButton.Font = Enum.Font.Gotham
+            valueButton.Text = options[EnhancedSettings[settingKey] + 1] -- Correção: +1 para arrays base-1
+            valueButton.Parent = settingFrame
+
+            local buttonCorner = Instance.new("UICorner")
+            buttonCorner.CornerRadius = UDim.new(0, 8)
+            buttonCorner.Parent = valueButton
+
+            local buttonStroke = Instance.new("UIStroke")
+            buttonStroke.Color = Color3.fromRGB(0, 255, 127)
+            buttonStroke.Thickness = 1
+            buttonStroke.Parent = valueButton
+
+            valueButton.MouseButton1Click:Connect(function()
+                local currentValue = EnhancedSettings[settingKey]
+                local nextValue = (currentValue + 1) % #options
+                EnhancedSettings[settingKey] = nextValue
+                valueButton.Text = options[nextValue + 1] -- Correção: +1 para arrays base-1
+                applyEnhancements()
+                if settingKey == "SpeedLevel" or settingKey == "StaminaMode" or 
+                   settingKey == "StunResistance" or settingKey == "ComboSpeed" or 
+                   settingKey == "AutoFeatures" then
+                    enhanceCharacter(player.Character)
+                end
+            end)
+
+            return settingFrame
+        end
+
+        -- Create all settings controls
+        local settingOptions = {
+            CooldownLevel = {"Normal", "Fast", "Ultra", "Instant"},
+            HitboxLevel = {"Normal", "Extended", "Wide", "Massive"},
+            BlockingMode = {"Normal", "Enhanced", "Auto", "Perfect"},
+            DamageLevel = {"Normal", "Boosted", "High", "Extreme"},
+            SpeedLevel = {"Normal", "Fast", "Sonic", "Flash"},
+            StaminaMode = {"Normal", "Extended", "Infinite"},
+            StunResistance = {"Normal", "Reduced", "Immune"},
+            CriticalLevel = {"Normal", "Lucky", "Critical", "Destroyer"},
+            ComboSpeed = {"Normal", "Fast", "Rapid", "Lightning"},
+            AutoFeatures = {"Off", "Attack", "Block", "Both"},
+            RangeBoost = {"Normal", "Long", "Extended", "Massive"},
+            KnockbackPower = {"Normal", "Strong", "Powerful", "Devastating"}
+        }
+
+        for settingName, options in pairs(settingOptions) do
+            createSettingControl(settingName:gsub("([A-Z])", " %1"):gsub("^%s", ""), settingName, options)
+        end
+
+        -- Toggle GUI visibility
+        local isVisible = true
+        closeButton.MouseButton1Click:Connect(function()
             isVisible = not isVisible
             mainFrame.Visible = isVisible
-        end
+        end)
+
+        -- Hotkey to toggle GUI
+        connections.guiToggleConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode == Enum.KeyCode.P then
+                isVisible = not isVisible
+                mainFrame.Visible = isVisible
+            end
+        end)
     end)
 end
 
@@ -769,7 +853,7 @@ local function cleanup()
             local attacking = config:FindFirstChild("Attacking")
             if attacking then
                 local cooldowns = attacking:FindFirstChild("Cooldowns")
-                if cooldowns then
+                if cooldowns and OriginalValues.AttackCooldowns then
                     for i, value in pairs(OriginalValues.AttackCooldowns) do
                         local cooldown = cooldowns:FindFirstChild(tostring(i))
                         if cooldown then
@@ -779,7 +863,7 @@ local function cleanup()
                 end
 
                 local ranges = attacking:FindFirstChild("Ranges")
-                if ranges then
+                if ranges and OriginalValues.AttackRanges then
                     for i, value in pairs(OriginalValues.AttackRanges) do
                         local range = ranges:FindFirstChild(tostring(i))
                         if range then
@@ -789,7 +873,7 @@ local function cleanup()
                 end
 
                 local dash = attacking:FindFirstChild("Dash")
-                if dash then
+                if dash and OriginalValues.DashValues then
                     for i, value in pairs(OriginalValues.DashValues) do
                         local dashValue = dash:FindFirstChild(tostring(i))
                         if dashValue then
@@ -802,7 +886,7 @@ local function cleanup()
             local damage = config:FindFirstChild("Damage")
             if damage then
                 local comboDamage = damage:FindFirstChild("ComboDamage")
-                if comboDamage then
+                if comboDamage and OriginalValues.ComboDamage then
                     for i, value in pairs(OriginalValues.ComboDamage) do
                         local dmg = comboDamage:FindFirstChild(tostring(i))
                         if dmg then
@@ -825,7 +909,7 @@ local function cleanup()
             local knockback = config:FindFirstChild("Knockback")
             if knockback then
                 local comboKnockback = knockback:FindFirstChild("ComboKnockback")
-                if comboKnockback then
+                if comboKnockback and OriginalValues.ComboKnockback then
                     for i, value in pairs(OriginalValues.ComboKnockback) do
                         local kb = comboKnockback:FindFirstChild(tostring(i))
                         if kb then
@@ -840,10 +924,38 @@ local function cleanup()
                                     "EnhancedDash", "EnhancedComboDamage", "EnhancedComboKnockback", 
                                     "EnhancedBlock", "EnhancedUsers"}
             for _, folderName in ipairs(enhancedFolders) do
-                local folder = config:FindFirstChild(folderName)
-                if folder then
-                    folder:Destroy()
-                end
+                safeCall(function()
+                    -- Procurar em diferentes locais
+                    local folder = config:FindFirstChild(folderName)
+                    if folder then
+                        folder:Destroy()
+                    else
+                        -- Procurar dentro das subpastas
+                        local attacking = config:FindFirstChild("Attacking")
+                        if attacking then
+                            folder = attacking:FindFirstChild(folderName)
+                            if folder then folder:Destroy() end
+                        end
+                        
+                        local damage = config:FindFirstChild("Damage")
+                        if damage then
+                            folder = damage:FindFirstChild(folderName)
+                            if folder then folder:Destroy() end
+                        end
+                        
+                        local knockback = config:FindFirstChild("Knockback")
+                        if knockback then
+                            folder = knockback:FindFirstChild(folderName)
+                            if folder then folder:Destroy() end
+                        end
+                        
+                        local blocking = config:FindFirstChild("Blocking")
+                        if blocking then
+                            folder = blocking:FindFirstChild(folderName)
+                            if folder then folder:Destroy() end
+                        end
+                    end
+                end)
             end
         end
 
@@ -863,6 +975,12 @@ end
 -- Initialize script
 local function initialize()
     safeCall(function()
+        -- Verificar se o ReplicatedStorage existe e tem a configuração necessária
+        if not ReplicatedStorage:FindFirstChild("CombatConfiguration") then
+            warn("CombatConfiguration não encontrada no ReplicatedStorage")
+            return
+        end
+        
         -- Create and backup structures
         createEnhancedStructure()
         backupOriginalValues()
@@ -878,6 +996,8 @@ local function initialize()
         
         -- Setup character added connection
         connections.characterConnection = player.CharacterAdded:Connect(function(character)
+            -- Aguardar um pouco para o personagem carregar completamente
+            task.wait(1)
             enhanceCharacter(character)
         end)
         
@@ -890,6 +1010,8 @@ local function initialize()
                 cleanup()
             end
         end)
+        
+        print("Enhanced Combat System initialized successfully!")
     end)
 end
 
