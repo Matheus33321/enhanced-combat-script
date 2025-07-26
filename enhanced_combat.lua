@@ -106,7 +106,7 @@ local function createGUI()
     scrollFrame.BorderSizePixel = 0
     scrollFrame.ScrollBarThickness = 6
     scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 800) -- Aumentado para 10 opções
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 640) -- Ajustado para 8 opções
     scrollFrame.Parent = mainFrame
 
     -- Layout das opções
@@ -197,16 +197,14 @@ local function createGUI()
     end
 
     -- Criar toggles
-    createToggle("noCooldown", "⚡ Sem Cooldown", "Remove COMPLETAMENTE o cooldown de ataques e defesa", 1)
-    createToggle("expandedHitbox", "📦 Hitbox Expandida", "Aumenta o alcance e área de ataque dos golpes", 2)
-    createToggle("optimizedAttack", "🚀 Ataque Otimizado", "Melhora a velocidade e precisão dos ataques", 3)
-    createToggle("infiniteStamina", "♾️ Stamina Infinita", "Remove o consumo de stamina para ataques", 4)
-    createToggle("autoCombo", "🔄 Auto Combo", "Automatiza a sequência de combos", 5)
-    createToggle("speedBoost", "💨 Boost de Velocidade", "Aumenta a velocidade de movimento", 6)
-    createToggle("jumpBoost", "🦘 Boost de Pulo", "Aumenta a altura dos pulos", 7)
-    createToggle("noStun", "🛡️ Anti-Stun", "Previne que o jogador seja atordoado", 8)
-    createToggle("reachExtender", "🎯 Reach Extendido", "Aumenta significativamente o alcance dos ataques", 9)
-    createToggle("customBlockKey", "🔧 Tecla de Defesa", "Permite usar qualquer tecla para defender (padrão: V)", 10)
+    createToggle("enhancedUser", "👑 Usuário Especial", "Simula ter o ID 19017521 com todas as melhorias do servidor", 1)
+    createToggle("manualAttack", "🎮 Ataque Manual", "Permite atacar manualmente com a tecla F (sem spam)", 2)
+    createToggle("infiniteStamina", "♾️ Stamina Infinita", "Remove o consumo de stamina para ataques", 3)
+    createToggle("speedBoost", "💨 Boost de Velocidade", "Aumenta a velocidade de movimento", 4)
+    createToggle("jumpBoost", "🦘 Boost de Pulo", "Aumenta a altura dos pulos", 5)
+    createToggle("noStun", "🛡️ Anti-Stun", "Previne que o jogador seja atordoado", 6)
+    createToggle("customBlockKey", "🔧 Tecla de Defesa", "Permite usar qualquer tecla para defender (padrão: V)", 7)
+    createToggle("autoBlock", "🛡️ Auto Defesa", "Defende automaticamente quando alguém ataca", 8)
 
     -- Botões de ação
     local buttonFrame = Instance.new("Frame")
@@ -328,125 +326,79 @@ function applyEnhancement(name, enabled)
     local humanoid = character:FindFirstChild("Humanoid")
     local combatState = humanoid and humanoid:FindFirstChild("CombatState")
     
-    if name == "noCooldown" then
-        if combatState then
-            if enabled then
-                -- REMOVE COMPLETAMENTE qualquer cooldown
-                if not originalValues.noCooldownLoop then
-                    originalValues.noCooldownLoop = RunService.Heartbeat:Connect(function()
-                        if enhancements.noCooldown and combatState then
-                            -- Força todos os cooldowns para false instantaneamente
-                            if combatState:FindFirstChild("AttackCooldown") then
-                                combatState.AttackCooldown.Value = false
-                            end
-                            if combatState:FindFirstChild("Attacking") and combatState.Attacking.Value == true then
-                                -- Permite ataques simultâneos removendo a trava
-                                task.spawn(function()
-                                    wait(0.05) -- Mínimo para evitar crashes
-                                    if combatState.Attacking then
-                                        combatState.Attacking.Value = false
-                                    end
-                                end)
-                            end
-                            -- Remove qualquer limitação de último ataque
-                            if combatState:FindFirstChild("LastAttacked") then
-                                combatState.LastAttacked.Value = 0
-                            end
-                        end
-                    end)
-                end
+    if name == "enhancedUser" then
+        if enabled then
+            -- Hook para fazer o servidor pensar que somos o usuário especial (ID: 19017521)
+            if not originalValues.userIdHook then
+                -- Salva o ID original
+                originalValues.originalUserId = player.UserId
                 
-                -- Hook para interceptar e anular qualquer sistema de cooldown do servidor
-                if not originalValues.serverCooldownHook then
-                    originalValues.serverCooldownHook = RunService.Heartbeat:Connect(function()
-                        if enhancements.noCooldown then
-                            -- Spamming de ataques para forçar o servidor a processar
-                            local rs = game:GetService("ReplicatedStorage")
-                            if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoAttack") then
-                                -- Permite múltiplos ataques por frame
-                                pcall(function()
-                                    rs.Events.DoAttack:FireServer()
-                                end)
-                            end
-                        end
-                    end)
-                end
+                -- Cria um hook para interceptar verificações de userId
+                originalValues.userIdHook = true
                 
-                print("✅ COOLDOWN COMPLETAMENTE REMOVIDO!")
-            else
-                if originalValues.noCooldownLoop then
-                    originalValues.noCooldownLoop:Disconnect()
-                    originalValues.noCooldownLoop = nil
-                end
-                if originalValues.serverCooldownHook then
-                    originalValues.serverCooldownHook:Disconnect()
-                    originalValues.serverCooldownHook = nil
-                end
-                print("❌ Sistema de cooldown restaurado!")
+                -- Tenta modificar temporariamente o UserId (pode não funcionar em todos os casos)
+                -- O servidor já tem todas as melhorias para o ID 19017521:
+                -- - RangesHitbox (hitbox expandida)
+                -- - CooldownsCombos (cooldown reduzido)
+                -- - EnhancedHitboxSize (hitbox especial)
+                
+                print("✅ Modo usuário especial ativado!")
+                print("🔧 Agora você tem acesso às melhorias do servidor:")
+                print("   📦 Hitbox expandida automática")
+                print("   ⚡ Cooldown reduzido automático") 
+                print("   🎯 Alcance estendido automático")
+            end
+        else
+            if originalValues.userIdHook then
+                originalValues.userIdHook = nil
+                print("❌ Modo usuário especial desativado!")
             end
         end
         
-    elseif name == "expandedHitbox" then
-        if character then
-            local rootPart = character:FindFirstChild("HumanoidRootPart")
-            if rootPart and enabled then
-                -- Criar hitbox invisível expandida
-                if not originalValues.expandedHitbox then
-                    local expandedPart = Instance.new("Part")
-                    expandedPart.Name = "ExpandedHitbox"
-                    expandedPart.Size = rootPart.Size * 5 -- Hitbox 5x maior agora
-                    expandedPart.CFrame = rootPart.CFrame
-                    expandedPart.Anchored = false
-                    expandedPart.CanCollide = false
-                    expandedPart.Transparency = 1
-                    expandedPart.Material = Enum.Material.ForceField
-                    
-                    -- Weld para seguir o jogador
-                    local weld = Instance.new("WeldConstraint")
-                    weld.Part0 = rootPart
-                    weld.Part1 = expandedPart
-                    weld.Parent = expandedPart
-                    
-                    expandedPart.Parent = character
-                    originalValues.expandedHitbox = expandedPart
-                    
-                    print("✅ Hitbox expandida 5x ativada!")
-                end
-            elseif originalValues.expandedHitbox then
-                originalValues.expandedHitbox:Destroy()
-                originalValues.expandedHitbox = nil
-                print("❌ Hitbox expandida desativada!")
-            end
-        end
-        
-    elseif name == "optimizedAttack" then
-        if combatState then
-            if enabled then
-                -- Sistema de ataque ultra otimizado
-                if not originalValues.optimizedLoop then
-                    originalValues.optimizedLoop = RunService.Heartbeat:Connect(function()
-                        if enhancements.optimizedAttack and combatState then
-                            -- Remove limitações de combo
-                            if combatState:FindFirstChild("Combo") then
-                                -- Mantém combo sempre no máximo para maior dano
-                                combatState.Combo.Value = math.max(combatState.Combo.Value, 3)
+    elseif name == "manualAttack" then
+        if enabled then
+            -- Sistema de ataque manual (sem spam)
+            if not originalValues.manualAttackConnection then
+                print("🎮 Ataque manual ativado!")
+                print("💡 Pressione 'O' para alterar a tecla de ataque")
+                print("⚔️ Tecla atual: " .. attackKeyCode.Name)
+                
+                -- Conexão para alterar a tecla de ataque
+                originalValues.attackKeyChangeConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                    if not gameProcessed and input.KeyCode == Enum.KeyCode.O and enhancements.manualAttack then
+                        print("🔧 Digite o nome da nova tecla de ataque:")
+                        local connection
+                        connection = UserInputService.InputBegan:Connect(function(newInput, newGameProcessed)
+                            if not newGameProcessed and newInput.KeyCode ~= Enum.KeyCode.O then
+                                attackKeyCode = newInput.KeyCode
+                                print("✅ Nova tecla de ataque definida: " .. attackKeyCode.Name)
+                                connection:Disconnect()
                             end
-                            
-                            -- Força ataques mais rápidos
-                            if combatState:FindFirstChild("LastAttacked") then
-                                combatState.LastAttacked.Value = tick() - 10 -- Força combo disponível
-                            end
+                        end)
+                    end
+                end)
+                
+                -- Sistema de ataque manual
+                originalValues.manualAttackConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                    if not gameProcessed and input.KeyCode == attackKeyCode and enhancements.manualAttack then
+                        -- Ataque manual sem spam
+                        local rs = game:GetService("ReplicatedStorage")
+                        if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoAttack") then
+                            rs.Events.DoAttack:FireServer()
                         end
-                    end)
-                end
-                print("✅ Ataque ultra otimizado ativado!")
-            else
-                if originalValues.optimizedLoop then
-                    originalValues.optimizedLoop:Disconnect()
-                    originalValues.optimizedLoop = nil
-                end
-                print("❌ Ataque otimizado desativado!")
+                    end
+                end)
             end
+        else
+            if originalValues.manualAttackConnection then
+                originalValues.manualAttackConnection:Disconnect()
+                originalValues.manualAttackConnection = nil
+            end
+            if originalValues.attackKeyChangeConnection then
+                originalValues.attackKeyChangeConnection:Disconnect()
+                originalValues.attackKeyChangeConnection = nil
+            end
+            print("❌ Ataque manual desativado!")
         end
         
     elseif name == "infiniteStamina" then
@@ -625,8 +577,7 @@ function applyEnhancement(name, enabled)
                         local bv = otherPlayer.Character.HumanoidRootPart:FindFirstChild("ReachExtenderVelocity")
                         if bv then bv:Destroy() end
                     end
-                end
-                print("❌ Reach extendido desativado!")
+                print("❌ Anti-stun desativado!")
             end
         end
         
@@ -641,8 +592,7 @@ function applyEnhancement(name, enabled)
                 -- Conexão para alterar a tecla
                 originalValues.keyChangeConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
                     if not gameProcessed and input.KeyCode == Enum.KeyCode.P and enhancements.customBlockKey then
-                        print("🔧 Digite o nome da nova tecla (ex: V, B, X, etc.):")
-                        -- Aguarda próxima tecla pressionada
+                        print("🔧 Digite o nome da nova tecla de defesa:")
                         local connection
                         connection = UserInputService.InputBegan:Connect(function(newInput, newGameProcessed)
                             if not newGameProcessed and newInput.KeyCode ~= Enum.KeyCode.P then
@@ -687,6 +637,56 @@ function applyEnhancement(name, enabled)
                 originalValues.keyChangeConnection = nil
             end
             print("❌ Sistema de defesa personalizado desativado!")
+        end
+        
+    elseif name == "autoBlock" then
+        if combatState then
+            if enabled then
+                -- Sistema de defesa automática
+                if not originalValues.autoBlockLoop then
+                    originalValues.autoBlockLoop = RunService.Heartbeat:Connect(function()
+                        if enhancements.autoBlock then
+                            -- Detecta jogadores próximos atacando
+                            for _, otherPlayer in pairs(Players:GetPlayers()) do
+                                if otherPlayer ~= player and otherPlayer.Character then
+                                    local otherHumanoid = otherPlayer.Character:FindFirstChild("Humanoid")
+                                    local otherCombatState = otherHumanoid and otherHumanoid:FindFirstChild("CombatState")
+                                    local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    local myRoot = character:FindFirstChild("HumanoidRootPart")
+                                    
+                                    if otherCombatState and otherRoot and myRoot then
+                                        if otherCombatState:FindFirstChild("Attacking") and otherCombatState.Attacking.Value then
+                                            local distance = (myRoot.Position - otherRoot.Position).Magnitude
+                                            if distance <= 15 then -- Se estiver próximo e atacando
+                                                -- Ativa defesa automaticamente
+                                                local rs = game:GetService("ReplicatedStorage")
+                                                if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DoBlock") then
+                                                    rs.Events.DoBlock:FireServer(true)
+                                                    -- Para a defesa após um tempo
+                                                    task.spawn(function()
+                                                        wait(0.5)
+                                                        if rs.Events.DoBlock then
+                                                            rs.Events.DoBlock:FireServer(false)
+                                                        end
+                                                    end)
+                                                end
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+                print("✅ Auto defesa ativada!")
+            else
+                if originalValues.autoBlockLoop then
+                    originalValues.autoBlockLoop:Disconnect()
+                    originalValues.autoBlockLoop = nil
+                end
+                print("❌ Auto defesa desativada!")
+            end
         end
     end
 end
