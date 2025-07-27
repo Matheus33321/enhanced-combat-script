@@ -1,384 +1,313 @@
--- Enhanced Combat System - Versão Ultra Básica
--- Para executar: loadstring(game:HttpGet("https://raw.githubusercontent.com/Matheus33321/enhanced-combat-script/main/enhanced_combat.lua"))()
 
-local success, result = pcall(function()
-    local Players = game:GetService("Players")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local RunService = game:GetService("RunService")
+-- Enhanced Hitbox Script for Roblox - Menu Configuration
+-- Menu interativo para configurar hitbox e visibilidade
+
+local ENHANCED_CONFIG = {
+    -- Multiplicadores de range para cada combo
+    rangeMultipliers = {
+        [1] = 3.0,  -- Primeiro ataque: 3x o range original
+        [2] = 3.5,  -- Segundo ataque: 3.5x o range original
+        [3] = 4.0,  -- Terceiro ataque: 4x o range original
+        [4] = 4.5,  -- Quarto ataque: 4.5x o range original
+    },
     
-    local player = Players.LocalPlayer
+    -- Range máximo garantido (em studs)
+    maxGuaranteedRange = 20,
     
-    -- Limpar qualquer UI existente
-    for _, gui in pairs(player.PlayerGui:GetChildren()) do
-        if gui.Name == "EnhancedCombatUI" then
-            gui:Destroy()
-        end
-    end
+    -- Ângulo de detecção (em graus) - 360 = detecção completa ao redor
+    detectionAngle = 180,
     
-    -- Verificar se já está carregado
-    if _G.CombatSystemLoaded then
-        _G.CombatSystemLoaded = false
-        task.wait(0.5)
-    end
-    _G.CombatSystemLoaded = true
+    -- Altura de detecção (para cima e para baixo)
+    verticalRange = 10,
     
-    print("🔥 CARREGANDO SISTEMA ULTRA BÁSICO...")
+    -- Se deve ignorar paredes/obstáculos
+    ignoreObstacles = true,
     
-    -- Aguardar configurações
-    local config = ReplicatedStorage:WaitForChild("CombatConfiguration", 10)
-    if not config then
-        warn("❌ CombatConfiguration não encontrada!")
-        return
-    end
-    print("✅ CombatConfiguration encontrada")
+    -- Priorizar alvos mais próximos
+    prioritizeClosest = true,
     
-    -- Configurações das melhorias
-    local improvements = {
-        noCooldown = false,
-        expandedHitbox = false,
-        autoStamina = false,
-        removeStun = false
+    -- Auto-hit (sempre acerta independente da distância)
+    autoHit = true,
+    
+    -- Visibilidade da hitbox
+    showHitbox = false,
+    
+    -- Cor da hitbox visual
+    hitboxColor = {r = 1, g = 0, b = 0}, -- Vermelho
+    
+    -- Transparência da hitbox (0 = opaco, 1 = transparente)
+    hitboxTransparency = 0.5
+}
+
+-- Sistema de Menu
+local Menu = {}
+
+function Menu:new()
+    local menu = {
+        isVisible = false,
+        options = {
+            "1. Configurar Range Multiplier",
+            "2. Configurar Range Máximo",
+            "3. Configurar Ângulo de Detecção",
+            "4. Toggle Auto-Hit",
+            "5. Toggle Visibilidade da Hitbox",
+            "6. Configurar Cor da Hitbox",
+            "7. Configurar Transparência",
+            "8. Mostrar Configurações Atuais",
+            "9. Resetar Configurações",
+            "0. Sair"
+        }
     }
+    setmetatable(menu, {__index = self})
+    return menu
+end
+
+function Menu:show()
+    print("\n" .. "="*50)
+    print("🎯 ENHANCED HITBOX - MENU DE CONFIGURAÇÃO")
+    print("="*50)
     
-    -- Valores originais
-    local originalValues = {}
-    
-    -- Salvar valores originais
-    local function saveOriginalValues()
-        pcall(function()
-            if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
-                originalValues.cooldowns = {}
-                for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
-                    if cooldown:IsA("NumberValue") then
-                        originalValues.cooldowns[cooldown.Name] = cooldown.Value
-                        print("💾 Salvou cooldown:", cooldown.Name, "=", cooldown.Value)
-                    end
-                end
-            end
-            
-            if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Ranges") then
-                originalValues.ranges = {}
-                for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
-                    if range:IsA("NumberValue") then
-                        originalValues.ranges[range.Name] = range.Value
-                        print("💾 Salvou range:", range.Name, "=", range.Value)
-                    end
-                end
-            end
-            
-            if config:FindFirstChild("Stamina") then
-                if config.Stamina:FindFirstChild("AttackStaminaCost") then
-                    originalValues.staminaCost = config.Stamina.AttackStaminaCost.Value
-                    print("💾 Salvou stamina cost:", originalValues.staminaCost)
-                end
-            end
-            
-            if config:FindFirstChild("Stunned") and config.Stunned:FindFirstChild("StunDurations") then
-                originalValues.stunDurations = {}
-                for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
-                    if stun:IsA("NumberValue") then
-                        originalValues.stunDurations[stun.Name] = stun.Value
-                        print("💾 Salvou stun:", stun.Name, "=", stun.Value)
-                    end
-                end
-            end
-        end)
-        print("💾 Valores originais salvos!")
+    for _, option in ipairs(self.options) do
+        print(option)
     end
     
-    -- Aplicar melhorias
-    local function applyImprovements()
-        task.spawn(function()
-            while _G.CombatSystemLoaded do
-                pcall(function()
-                    -- Sem Cooldown
-                    if improvements.noCooldown then
-                        if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
-                            for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
-                                if cooldown:IsA("NumberValue") then
-                                    cooldown.Value = 0 -- ZERO ABSOLUTO
-                                    print("🚀 Cooldown REMOVIDO:", cooldown.Name, "-> 0")
-                                end
-                            end
-                        end
-                    else
-                        -- Restaurar cooldowns originais
-                        if originalValues.cooldowns then
-                            for name, value in pairs(originalValues.cooldowns) do
-                                local cooldown = config.Attacking.Cooldowns:FindFirstChild(name)
-                                if cooldown and cooldown:IsA("NumberValue") then
-                                    cooldown.Value = value
-                                end
-                            end
-                        end
-                    end
-                    
-                    -- Hitbox Expandida
-                    if improvements.expandedHitbox then
-                        if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Ranges") then
-                            for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
-                                if range:IsA("NumberValue") and originalValues.ranges and originalValues.ranges[range.Name] then
-                                    range.Value = originalValues.ranges[range.Name] * 3
-                                    print("🎯 Range expandido:", range.Name, "para", range.Value)
-                                end
-                            end
-                        end
-                    else
-                        -- Restaurar ranges originais
-                        if originalValues.ranges then
-                            for name, value in pairs(originalValues.ranges) do
-                                local range = config.Attacking.Ranges:FindFirstChild(name)
-                                if range and range:IsA("NumberValue") then
-                                    range.Value = value
-                                end
-                            end
-                        end
-                    end
-                    
-                    -- Stamina Infinita
-                    if improvements.autoStamina then
-                        if config:FindFirstChild("Stamina") then
-                            if config.Stamina:FindFirstChild("AttackStaminaCost") then
-                                config.Stamina.AttackStaminaCost.Value = 0 -- ZERO ABSOLUTO
-                                print("♾️ Stamina cost REMOVIDO -> 0")
-                            end
-                            if config.Stamina:FindFirstChild("StaminaDecreaseRate") then
-                                config.Stamina.StaminaDecreaseRate.Value = 0 -- ZERO ABSOLUTO
-                                print("♾️ Stamina decrease REMOVIDO -> 0")
-                            end
-                            if config.Stamina:FindFirstChild("StaminaIncreaseRate") then
-                                config.Stamina.StaminaIncreaseRate.Value = 1000 -- REGENERAÇÃO ALTA
-                                print("♾️ Stamina regen AUMENTADO -> 1000")
-                            end
-                        end
-                    else
-                        -- Restaurar stamina original
-                        if originalValues.staminaCost and config.Stamina and config.Stamina:FindFirstChild("AttackStaminaCost") then
-                            config.Stamina.AttackStaminaCost.Value = originalValues.staminaCost
-                        end
-                    end
-                    
-                    -- Sem Stun
-                    if improvements.removeStun then
-                        if config:FindFirstChild("Stunned") and config.Stunned:FindFirstChild("StunDurations") then
-                            for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
-                                if stun:IsA("NumberValue") then
-                                    stun.Value = 0 -- ZERO ABSOLUTO
-                                    print("🛡️ Stun REMOVIDO:", stun.Name, "-> 0")
-                                end
-                            end
-                        end
-                    else
-                        -- Restaurar stuns originais
-                        if originalValues.stunDurations then
-                            for name, value in pairs(originalValues.stunDurations) do
-                                local stun = config.Stunned.StunDurations:FindFirstChild(name)
-                                if stun and stun:IsA("NumberValue") then
-                                    stun.Value = value
-                                end
-                            end
-                        end
-                    end
-                end)
-                
-                task.wait(0.1) -- Verificar mais frequentemente
-            end
-        end)
+    print("="*50)
+    print("Digite o número da opção desejada:")
+end
+
+function Menu:showCurrentConfig()
+    print("\n📊 CONFIGURAÇÕES ATUAIS:")
+    print("------------------------")
+    print("Range Multipliers:")
+    for combo, mult in pairs(ENHANCED_CONFIG.rangeMultipliers) do
+        print(string.format("  Combo %d: %.1fx", combo, mult))
     end
+    print(string.format("Range Máximo: %d studs", ENHANCED_CONFIG.maxGuaranteedRange))
+    print(string.format("Ângulo de Detecção: %d°", ENHANCED_CONFIG.detectionAngle))
+    print(string.format("Auto-Hit: %s", ENHANCED_CONFIG.autoHit and "ATIVADO" or "DESATIVADO"))
+    print(string.format("Hitbox Visível: %s", ENHANCED_CONFIG.showHitbox and "SIM" or "NÃO"))
+    print(string.format("Cor da Hitbox: R=%.1f G=%.1f B=%.1f", 
+          ENHANCED_CONFIG.hitboxColor.r, 
+          ENHANCED_CONFIG.hitboxColor.g, 
+          ENHANCED_CONFIG.hitboxColor.b))
+    print(string.format("Transparência: %.1f", ENHANCED_CONFIG.hitboxTransparency))
+end
+
+function Menu:configureRangeMultiplier()
+    print("\n🎯 CONFIGURAR RANGE MULTIPLIER")
+    print("Qual combo você quer alterar? (1-4):")
+    local combo = tonumber(io.read())
     
-    -- Interface MINIMALISTA (sem erros)
-    local function createBasicUI()
-        print("🎨 Criando UI básica...")
+    if combo and combo >= 1 and combo <= 4 then
+        print(string.format("Multiplicador atual para combo %d: %.1fx", combo, ENHANCED_CONFIG.rangeMultipliers[combo]))
+        print("Digite o novo multiplicador (ex: 5.0):")
+        local multiplier = tonumber(io.read())
         
-        -- ScreenGui simples
-        local screenGui = Instance.new("ScreenGui")
-        screenGui.Name = "EnhancedCombatUI"
-        screenGui.ResetOnSpawn = false
+        if multiplier and multiplier > 0 then
+            ENHANCED_CONFIG.rangeMultipliers[combo] = multiplier
+            print(string.format("✅ Multiplicador do combo %d alterado para %.1fx", combo, multiplier))
+        else
+            print("❌ Valor inválido!")
+        end
+    else
+        print("❌ Combo inválido!")
+    end
+end
+
+function Menu:configureMaxRange()
+    print("\n📏 CONFIGURAR RANGE MÁXIMO")
+    print(string.format("Range máximo atual: %d studs", ENHANCED_CONFIG.maxGuaranteedRange))
+    print("Digite o novo range máximo:")
+    local range = tonumber(io.read())
+    
+    if range and range > 0 then
+        ENHANCED_CONFIG.maxGuaranteedRange = range
+        print(string.format("✅ Range máximo alterado para %d studs", range))
+    else
+        print("❌ Valor inválido!")
+    end
+end
+
+function Menu:configureAngle()
+    print("\n🔄 CONFIGURAR ÂNGULO DE DETECÇÃO")
+    print(string.format("Ângulo atual: %d°", ENHANCED_CONFIG.detectionAngle))
+    print("Digite o novo ângulo (0-360):")
+    local angle = tonumber(io.read())
+    
+    if angle and angle >= 0 and angle <= 360 then
+        ENHANCED_CONFIG.detectionAngle = angle
+        print(string.format("✅ Ângulo alterado para %d°", angle))
+    else
+        print("❌ Ângulo inválido! Digite um valor entre 0 e 360.")
+    end
+end
+
+function Menu:toggleAutoHit()
+    ENHANCED_CONFIG.autoHit = not ENHANCED_CONFIG.autoHit
+    print(string.format("✅ Auto-Hit %s", ENHANCED_CONFIG.autoHit and "ATIVADO" or "DESATIVADO"))
+end
+
+function Menu:toggleHitboxVisibility()
+    ENHANCED_CONFIG.showHitbox = not ENHANCED_CONFIG.showHitbox
+    print(string.format("✅ Visibilidade da Hitbox %s", ENHANCED_CONFIG.showHitbox and "ATIVADA" or "DESATIVADA"))
+end
+
+function Menu:configureHitboxColor()
+    print("\n🎨 CONFIGURAR COR DA HITBOX")
+    print("Digite os valores RGB (0-1):")
+    
+    print("Vermelho (R):")
+    local r = tonumber(io.read())
+    print("Verde (G):")
+    local g = tonumber(io.read())
+    print("Azul (B):")
+    local b = tonumber(io.read())
+    
+    if r and g and b and r >= 0 and r <= 1 and g >= 0 and g <= 1 and b >= 0 and b <= 1 then
+        ENHANCED_CONFIG.hitboxColor = {r = r, g = g, b = b}
+        print(string.format("✅ Cor alterada para R=%.1f G=%.1f B=%.1f", r, g, b))
+    else
+        print("❌ Valores inválidos! Use valores entre 0 e 1.")
+    end
+end
+
+function Menu:configureTransparency()
+    print("\n👻 CONFIGURAR TRANSPARÊNCIA")
+    print(string.format("Transparência atual: %.1f", ENHANCED_CONFIG.hitboxTransparency))
+    print("Digite a nova transparência (0-1, onde 0=opaco e 1=transparente):")
+    local transparency = tonumber(io.read())
+    
+    if transparency and transparency >= 0 and transparency <= 1 then
+        ENHANCED_CONFIG.hitboxTransparency = transparency
+        print(string.format("✅ Transparência alterada para %.1f", transparency))
+    else
+        print("❌ Valor inválido! Use um valor entre 0 e 1.")
+    end
+end
+
+function Menu:resetConfig()
+    print("\n🔄 RESETAR CONFIGURAÇÕES")
+    print("Tem certeza que deseja resetar todas as configurações? (s/n)")
+    local confirm = io.read():lower()
+    
+    if confirm == "s" or confirm == "sim" then
+        ENHANCED_CONFIG.rangeMultipliers = {[1] = 3.0, [2] = 3.5, [3] = 4.0, [4] = 4.5}
+        ENHANCED_CONFIG.maxGuaranteedRange = 20
+        ENHANCED_CONFIG.detectionAngle = 180
+        ENHANCED_CONFIG.autoHit = true
+        ENHANCED_CONFIG.showHitbox = false
+        ENHANCED_CONFIG.hitboxColor = {r = 1, g = 0, b = 0}
+        ENHANCED_CONFIG.hitboxTransparency = 0.5
+        print("✅ Configurações resetadas para os valores padrão!")
+    else
+        print("❌ Operação cancelada.")
+    end
+end
+
+function Menu:handleOption(option)
+    if option == "1" then
+        self:configureRangeMultiplier()
+    elseif option == "2" then
+        self:configureMaxRange()
+    elseif option == "3" then
+        self:configureAngle()
+    elseif option == "4" then
+        self:toggleAutoHit()
+    elseif option == "5" then
+        self:toggleHitboxVisibility()
+    elseif option == "6" then
+        self:configureHitboxColor()
+    elseif option == "7" then
+        self:configureTransparency()
+    elseif option == "8" then
+        self:showCurrentConfig()
+    elseif option == "9" then
+        self:resetConfig()
+    elseif option == "0" then
+        return false
+    else
+        print("❌ Opção inválida!")
+    end
+    return true
+end
+
+-- Função para gerar código Roblox com as configurações atuais
+function generateRobloxScript()
+    local script = string.format([[
+-- Enhanced Hitbox Script - Configurado via Menu
+-- Configurações atuais aplicadas
+
+local ENHANCED_CONFIG = {
+    rangeMultipliers = {
+        [1] = %.1f,
+        [2] = %.1f,
+        [3] = %.1f,
+        [4] = %.1f,
+    },
+    maxGuaranteedRange = %d,
+    detectionAngle = %d,
+    verticalRange = 10,
+    ignoreObstacles = true,
+    prioritizeClosest = true,
+    autoHit = %s,
+    showHitbox = %s,
+    hitboxColor = Color3.fromRGB(%d, %d, %d),
+    hitboxTransparency = %.1f
+}
+
+-- [Resto do código do Enhanced Hitbox seria inserido aqui]
+-- Para usar no Roblox: loadstring(game:HttpGet("URL_DO_SCRIPT"))()
+
+print("🎯 Enhanced Hitbox Configurado!")
+print("📊 Configurações aplicadas:")
+for combo, mult in pairs(ENHANCED_CONFIG.rangeMultipliers) do
+    print("   Combo " .. combo .. ": " .. mult .. "x")
+end
+print("   Range máximo: " .. ENHANCED_CONFIG.maxGuaranteedRange .. " studs")
+print("   Auto-hit: " .. (ENHANCED_CONFIG.autoHit and "ATIVADO" or "DESATIVADO"))
+print("   Hitbox visível: " .. (ENHANCED_CONFIG.showHitbox and "SIM" or "NÃO"))
+]], 
+    ENHANCED_CONFIG.rangeMultipliers[1],
+    ENHANCED_CONFIG.rangeMultipliers[2], 
+    ENHANCED_CONFIG.rangeMultipliers[3],
+    ENHANCED_CONFIG.rangeMultipliers[4],
+    ENHANCED_CONFIG.maxGuaranteedRange,
+    ENHANCED_CONFIG.detectionAngle,
+    ENHANCED_CONFIG.autoHit and "true" or "false",
+    ENHANCED_CONFIG.showHitbox and "true" or "false",
+    math.floor(ENHANCED_CONFIG.hitboxColor.r * 255),
+    math.floor(ENHANCED_CONFIG.hitboxColor.g * 255),
+    math.floor(ENHANCED_CONFIG.hitboxColor.b * 255),
+    ENHANCED_CONFIG.hitboxTransparency)
+    
+    return script
+end
+
+-- Loop principal do menu
+function runMenu()
+    local menu = Menu:new()
+    
+    print("🎯 ENHANCED HITBOX - CONFIGURADOR")
+    print("Bem-vindo ao configurador de hitbox!")
+    
+    while true do
+        menu:show()
+        local option = io.read()
         
-        -- Frame principal sem elementos complicados
-        local mainFrame = Instance.new("Frame")
-        mainFrame.Size = UDim2.new(0, 350, 0, 400)
-        mainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
-        mainFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-        mainFrame.BorderSizePixel = 3
-        mainFrame.BorderColor3 = Color3.new(0, 1, 0)
-        mainFrame.Active = true
-        mainFrame.Draggable = true
-        mainFrame.Parent = screenGui
-        
-        -- Título simples
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, 0, 0, 40)
-        title.Position = UDim2.new(0, 0, 0, 0)
-        title.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-        title.BorderSizePixel = 0
-        title.Text = "ENHANCED COMBAT SYSTEM"
-        title.TextColor3 = Color3.new(0, 1, 0)
-        title.TextScaled = true
-        title.Font = Enum.Font.SourceSansBold
-        title.Parent = mainFrame
-        
-        -- Função para criar botão básico
-        local function createBasicButton(text, yPos, improvement)
-            local button = Instance.new("TextButton")
-            button.Size = UDim2.new(0, 300, 0, 35)
-            button.Position = UDim2.new(0, 25, 0, yPos)
-            button.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.8, 0) or Color3.new(0.8, 0, 0)
-            button.BorderSizePixel = 1
-            button.BorderColor3 = Color3.new(1, 1, 1)
-            button.Text = text .. " - " .. (improvements[improvement] and "ON" or "OFF")
-            button.TextColor3 = Color3.new(1, 1, 1)
-            button.TextScaled = true
-            button.Font = Enum.Font.SourceSansBold
-            button.Parent = mainFrame
-            
-            button.MouseButton1Click:Connect(function()
-                improvements[improvement] = not improvements[improvement]
-                button.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.8, 0) or Color3.new(0.8, 0, 0)
-                button.Text = text .. " - " .. (improvements[improvement] and "ON" or "OFF")
-                print("🔧 " .. text .. ": " .. (improvements[improvement] and "ATIVADO" or "DESATIVADO"))
-            end)
-            
-            return button
+        if not menu:handleOption(option) then
+            break
         end
         
-        -- Criar botões básicos
-        createBasicButton("SEM COOLDOWN", 60, "noCooldown")
-        createBasicButton("HITBOX 3X MAIOR", 110, "expandedHitbox")
-        createBasicButton("STAMINA INFINITA", 160, "autoStamina")
-        createBasicButton("SEM STUN", 210, "removeStun")
-        
-        -- Botão de teste
-        local testBtn = Instance.new("TextButton")
-        testBtn.Size = UDim2.new(0, 300, 0, 35)
-        testBtn.Position = UDim2.new(0, 25, 0, 270)
-        testBtn.BackgroundColor3 = Color3.new(0, 0, 1)
-        testBtn.BorderSizePixel = 1
-        testBtn.BorderColor3 = Color3.new(1, 1, 0)
-        testBtn.Text = "CLIQUE PARA TESTAR UI"
-        testBtn.TextColor3 = Color3.new(1, 1, 1)
-        testBtn.TextScaled = true
-        testBtn.Font = Enum.Font.SourceSansBold
-        testBtn.Parent = mainFrame
-        
-        testBtn.MouseButton1Click:Connect(function()
-            testBtn.Text = "UI FUNCIONANDO!"
-            testBtn.BackgroundColor3 = Color3.new(0, 1, 0)
-            print("✅ UI TESTE PASSOU!")
-        end)
-        
-        -- Botão para ativar tudo
-        local allBtn = Instance.new("TextButton")
-        allBtn.Size = UDim2.new(0, 300, 0, 35)
-        allBtn.Position = UDim2.new(0, 25, 0, 320)
-        allBtn.BackgroundColor3 = Color3.new(1, 0.5, 0)
-        allBtn.BorderSizePixel = 1
-        allBtn.BorderColor3 = Color3.new(1, 1, 1)
-        allBtn.Text = "ATIVAR TODAS AS MELHORIAS"
-        allBtn.TextColor3 = Color3.new(1, 1, 1)
-        allBtn.TextScaled = true
-        allBtn.Font = Enum.Font.SourceSansBold
-        allBtn.Parent = mainFrame
-        
-        allBtn.MouseButton1Click:Connect(function()
-            local allActive = improvements.noCooldown and improvements.expandedHitbox and improvements.autoStamina and improvements.removeStun
-            
-            for key, _ in pairs(improvements) do
-                improvements[key] = not allActive
-            end
-            
-            -- Atualizar todos os botões
-            for _, child in pairs(mainFrame:GetChildren()) do
-                if child:IsA("TextButton") and child ~= testBtn and child ~= allBtn then
-                    local improvement = child.Name:match("noCooldown") and "noCooldown" or
-                                      child.Name:match("expandedHitbox") and "expandedHitbox" or
-                                      child.Name:match("autoStamina") and "autoStamina" or
-                                      child.Name:match("removeStun") and "removeStun"
-                    
-                    if improvement then
-                        child.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.8, 0) or Color3.new(0.8, 0, 0)
-                    end
-                end
-            end
-            
-            allBtn.Text = (not allActive) and "DESATIVAR TODAS" or "ATIVAR TODAS AS MELHORIAS"
-            print("🔧 TODAS AS MELHORIAS: " .. ((not allActive) and "ATIVADAS" or "DESATIVADAS"))
-        end)
-        
-        -- Adicionar ao PlayerGui
-        screenGui.Parent = player.PlayerGui
-        
-        task.wait(0.1)
-        print("✅ UI criada no centro da tela!")
-        return screenGui
+        print("\nPressione Enter para continuar...")
+        io.read()
     end
     
-        -- Comandos de chat com debug
-        player.Chatted:Connect(function(message)
-            local msg = string.lower(message)
-            if msg == "!ui" or msg == "!combat" then
-                createBasicUI()
-                print("🎨 UI recriada!")
-            elseif msg == "!test" then
-                print("=== TESTE COMPLETO ===")
-                print("UI existe:", player.PlayerGui:FindFirstChild("EnhancedCombatUI") ~= nil)
-                print("Config existe:", config ~= nil)
-                
-                -- Testar estrutura
-                if config:FindFirstChild("Attacking") then
-                    print("✅ Attacking encontrado")
-                    if config.Attacking:FindFirstChild("Cooldowns") then
-                        print("✅ Cooldowns encontrado, itens:", #config.Attacking.Cooldowns:GetChildren())
-                    end
-                    if config.Attacking:FindFirstChild("Ranges") then
-                        print("✅ Ranges encontrado, itens:", #config.Attacking.Ranges:GetChildren())
-                    end
-                end
-                
-                if config:FindFirstChild("Stamina") then
-                    print("✅ Stamina encontrado")
-                end
-                
-                if config:FindFirstChild("Stunned") then
-                    print("✅ Stunned encontrado")
-                end
-                
-                print("--- STATUS DAS MELHORIAS ---")
-                for key, value in pairs(improvements) do
-                    print(key .. ":", value and "ATIVO" or "INATIVO")
-                end
-            elseif msg == "!debug" then
-                print("=== DEBUG VALORES ===")
-                if originalValues.cooldowns then
-                    for name, value in pairs(originalValues.cooldowns) do
-                        local current = config.Attacking.Cooldowns:FindFirstChild(name)
-                        print("Cooldown", name .. ":", "Original =", value, "Atual =", current and current.Value or "N/A")
-                    end
-                end
-                if originalValues.ranges then
-                    for name, value in pairs(originalValues.ranges) do
-                        local current = config.Attacking.Ranges:FindFirstChild(name)
-                        print("Range", name .. ":", "Original =", value, "Atual =", current and current.Value or "N/A")
-                    end
-                end
-            end
-        end)
-    
-    -- Inicializar
-    task.wait(1)
-    saveOriginalValues()
-    createBasicUI()
-    applyImprovements()
-    
-    print("⚔️ SISTEMA CARREGADO!")
-    print("💬 Digite !ui para recriar interface")
-    print("💬 Digite !test para verificar status")
-    
-    return true
-end)
-
-if not success then
-    warn("❌ ERRO:", tostring(result))
-else
-    print("✅ SUCESSO TOTAL!")
+    print("\n💾 SCRIPT GERADO:")
+    print("="*60)
+    print(generateRobloxScript())
+    print("="*60)
+    print("✅ Configuração concluída! Copie o script acima para usar no Roblox.")
 end
+
+-- Executar o menu
+runMenu()
