@@ -1,335 +1,459 @@
--- Enhanced Combat System with Improvements
--- Versão melhorada para fins de teste
+-- Enhanced Combat System - Versão Funcional
+-- Para executar: loadstring(game:HttpGet("https://raw.githubusercontent.com/[SEU_USERNAME]/[SEU_REPO]/main/combat.lua"))()
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-
-local player = Players.LocalPlayer
-
--- Configurações das melhorias
-local improvements = {
-    noCooldown = false,
-    expandedHitbox = false,
-    optimizedAttack = false,
-    autoStamina = false,
-    fastMovement = false
-}
-
--- Interface de comando
-local function createCommandInterface()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CombatImprovements"
-    gui.Parent = player:WaitForChild("PlayerGui")
+local success, result = pcall(function()
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    local TweenService = game:GetService("TweenService")
     
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 400)
-    frame.Position = UDim2.new(0, 10, 0.5, -200)
-    frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-    frame.BorderSizePixel = 0
-    frame.Parent = gui
+    local player = Players.LocalPlayer
     
-    -- Título
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 50)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-    title.BorderSizePixel = 0
-    title.Text = "MELHORIAS DE COMBATE"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.TextScaled = true
-    title.Font = Enum.Font.SourceSansBold
-    title.Parent = frame
+    -- Verificar se já está carregado
+    if _G.CombatSystemLoaded then
+        warn("Sistema de combate já está carregado!")
+        return
+    end
+    _G.CombatSystemLoaded = true
     
-    local yPos = 60
-    local buttonHeight = 40
-    local spacing = 50
+    -- Aguardar configurações do jogo
+    local config = ReplicatedStorage:WaitForChild("CombatConfiguration", 10)
+    if not config then
+        warn("❌ CombatConfiguration não encontrada!")
+        return
+    end
     
-    -- Função para criar botões
-    local function createToggleButton(name, displayName, improvement)
-        local button = Instance.new("TextButton")
-        button.Size = UDim2.new(0.9, 0, 0, buttonHeight)
-        button.Position = UDim2.new(0.05, 0, 0, yPos)
-        button.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.7, 0) or Color3.new(0.7, 0, 0)
-        button.BorderSizePixel = 0
-        button.Text = displayName .. ": " .. (improvements[improvement] and "ON" or "OFF")
-        button.TextColor3 = Color3.new(1, 1, 1)
-        button.TextScaled = true
-        button.Font = Enum.Font.SourceSans
-        button.Parent = frame
-        
-        button.MouseButton1Click:Connect(function()
-            improvements[improvement] = not improvements[improvement]
-            button.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.7, 0) or Color3.new(0.7, 0, 0)
-            button.Text = displayName .. ": " .. (improvements[improvement] and "ON" or "OFF")
-            print("[MELHORIA] " .. displayName .. " " .. (improvements[improvement] and "ATIVADA" or "DESATIVADA"))
+    -- Configurações das melhorias
+    local improvements = {
+        noCooldown = false,
+        expandedHitbox = false,
+        optimizedAttack = false,
+        autoStamina = false,
+        fastMovement = false,
+        removeStun = false
+    }
+    
+    -- Valores originais para restauração
+    local originalValues = {}
+    
+    -- Função para salvar valores originais
+    local function saveOriginalValues()
+        pcall(function()
+            -- Salvar cooldowns originais
+            if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
+                originalValues.cooldowns = {}
+                for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
+                    if cooldown:IsA("NumberValue") then
+                        originalValues.cooldowns[cooldown.Name] = cooldown.Value
+                    end
+                end
+            end
+            
+            -- Salvar ranges originais
+            if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Ranges") then
+                originalValues.ranges = {}
+                for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
+                    if range:IsA("NumberValue") then
+                        originalValues.ranges[range.Name] = range.Value
+                    end
+                end
+            end
+            
+            -- Salvar stamina originais
+            if config:FindFirstChild("Stamina") then
+                if config.Stamina:FindFirstChild("AttackStaminaCost") then
+                    originalValues.staminaCost = config.Stamina.AttackStaminaCost.Value
+                end
+                if config.Stamina:FindFirstChild("StaminaDecreaseRate") then
+                    originalValues.staminaDecrease = config.Stamina.StaminaDecreaseRate.Value
+                end
+            end
+            
+            -- Salvar stun durations originais
+            if config:FindFirstChild("Stunned") and config.Stunned:FindFirstChild("StunDurations") then
+                originalValues.stunDurations = {}
+                for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
+                    if stun:IsA("NumberValue") then
+                        originalValues.stunDurations[stun.Name] = stun.Value
+                    end
+                end
+            end
         end)
-        
-        yPos = yPos + spacing
     end
     
-    -- Criar botões
-    createToggleButton("nocooldown", "Sem Cooldown", "noCooldown")
-    createToggleButton("hitbox", "Hitbox Expandida", "expandedHitbox")
-    createToggleButton("attack", "Ataque Otimizado", "optimizedAttack")
-    createToggleButton("stamina", "Stamina Infinita", "autoStamina")
-    createToggleButton("speed", "Movimento Rápido", "fastMovement")
-    
-    -- Botão para fechar/abrir
-    local toggleButton = Instance.new("TextButton")
-    toggleButton.Size = UDim2.new(0, 100, 0, 30)
-    toggleButton.Position = UDim2.new(0, 10, 0, 10)
-    toggleButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-    toggleButton.BorderSizePixel = 0
-    toggleButton.Text = "OCULTAR"
-    toggleButton.TextColor3 = Color3.new(1, 1, 1)
-    toggleButton.TextScaled = true
-    toggleButton.Font = Enum.Font.SourceSans
-    toggleButton.Parent = gui
-    
-    toggleButton.MouseButton1Click:Connect(function()
-        frame.Visible = not frame.Visible
-        toggleButton.Text = frame.Visible and "OCULTAR" or "MOSTRAR"
-    end)
-end
-
--- Comando via chat
-local function handleChatCommand(message)
-    local args = string.split(string.lower(message), " ")
-    
-    if args[1] == "!melhoria" and args[2] then
-        local command = args[2]
-        
-        if command == "nocooldown" then
-            improvements.noCooldown = not improvements.noCooldown
-            print("[COMANDO] Sem cooldown: " .. (improvements.noCooldown and "ATIVADO" or "DESATIVADO"))
-        elseif command == "hitboxexpandida" then
-            improvements.expandedHitbox = not improvements.expandedHitbox
-            print("[COMANDO] Hitbox expandida: " .. (improvements.expandedHitbox and "ATIVADA" or "DESATIVADA"))
-        elseif command == "ataqueotimizado" then
-            improvements.optimizedAttack = not improvements.optimizedAttack
-            print("[COMANDO] Ataque otimizado: " .. (improvements.optimizedAttack and "ATIVADO" or "DESATIVADO"))
-        elseif command == "staminainfinita" then
-            improvements.autoStamina = not improvements.autoStamina
-            print("[COMANDO] Stamina infinita: " .. (improvements.autoStamina and "ATIVADA" or "DESATIVADA"))
-        elseif command == "velocidade" then
-            improvements.fastMovement = not improvements.fastMovement
-            print("[COMANDO] Movimento rápido: " .. (improvements.fastMovement and "ATIVADO" or "DESATIVADO"))
-        elseif command == "help" or command == "ajuda" then
-            print("=== COMANDOS DISPONÍVEIS ===")
-            print("!melhoria nocooldown - Remove cooldown dos ataques")
-            print("!melhoria hitboxexpandida - Expande a hitbox dos ataques")
-            print("!melhoria ataqueotimizado - Otimiza os ataques")
-            print("!melhoria staminainfinita - Stamina infinita")
-            print("!melhoria velocidade - Movimento mais rápido")
-        end
+    -- Aplicar melhorias nas configurações do jogo
+    local function applyImprovements()
+        task.spawn(function()
+            while _G.CombatSystemLoaded do
+                pcall(function()
+                    -- Sem Cooldown
+                    if improvements.noCooldown and config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
+                        for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
+                            if cooldown:IsA("NumberValue") then
+                                cooldown.Value = 0
+                            end
+                        end
+                    elseif not improvements.noCooldown and originalValues.cooldowns then
+                        for name, value in pairs(originalValues.cooldowns) do
+                            local cooldown = config.Attacking.Cooldowns:FindFirstChild(name)
+                            if cooldown and cooldown:IsA("NumberValue") then
+                                cooldown.Value = value
+                            end
+                        end
+                    end
+                    
+                    -- Hitbox Expandida
+                    if improvements.expandedHitbox and config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Ranges") then
+                        for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
+                            if range:IsA("NumberValue") then
+                                range.Value = originalValues.ranges and originalValues.ranges[range.Name] and originalValues.ranges[range.Name] * 2.5 or 20
+                            end
+                        end
+                    elseif not improvements.expandedHitbox and originalValues.ranges then
+                        for name, value in pairs(originalValues.ranges) do
+                            local range = config.Attacking.Ranges:FindFirstChild(name)
+                            if range and range:IsA("NumberValue") then
+                                range.Value = value
+                            end
+                        end
+                    end
+                    
+                    -- Stamina Infinita
+                    if improvements.autoStamina then
+                        -- Reduzir custo de stamina
+                        if config:FindFirstChild("Stamina") and config.Stamina:FindFirstChild("AttackStaminaCost") then
+                            config.Stamina.AttackStaminaCost.Value = 0
+                        end
+                        -- Remover diminuição de stamina
+                        if config:FindFirstChild("Stamina") and config.Stamina:FindFirstChild("StaminaDecreaseRate") then
+                            config.Stamina.StaminaDecreaseRate.Value = 0
+                        end
+                        -- Aumentar regeneração
+                        if config:FindFirstChild("Stamina") and config.Stamina:FindFirstChild("StaminaIncreaseRate") then
+                            config.Stamina.StaminaIncreaseRate.Value = 1000
+                        end
+                    else
+                        -- Restaurar valores originais
+                        if originalValues.staminaCost and config:FindFirstChild("Stamina") and config.Stamina:FindFirstChild("AttackStaminaCost") then
+                            config.Stamina.AttackStaminaCost.Value = originalValues.staminaCost
+                        end
+                        if originalValues.staminaDecrease and config:FindFirstChild("Stamina") and config.Stamina:FindFirstChild("StaminaDecreaseRate") then
+                            config.Stamina.StaminaDecreaseRate.Value = originalValues.staminaDecrease
+                        end
+                    end
+                    
+                    -- Remover Stun
+                    if improvements.removeStun and config:FindFirstChild("Stunned") and config.Stunned:FindFirstChild("StunDurations") then
+                        for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
+                            if stun:IsA("NumberValue") then
+                                stun.Value = 0
+                            end
+                        end
+                    elseif not improvements.removeStun and originalValues.stunDurations then
+                        for name, value in pairs(originalValues.stunDurations) do
+                            local stun = config.Stunned.StunDurations:FindFirstChild(name)
+                            if stun and stun:IsA("NumberValue") then
+                                stun.Value = value
+                            end
+                        end
+                    end
+                    
+                    -- Ataques Otimizados - Modificar dash
+                    if improvements.optimizedAttack and config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Dash") then
+                        for _, dash in pairs(config.Attacking.Dash:GetChildren()) do
+                            if dash:IsA("NumberValue") then
+                                dash.Value = math.max(dash.Value * 1.5, 25)
+                            end
+                        end
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end)
     end
-end
-
--- Sistema de combate melhorado
-local function setupEnhancedCombat()
-    local character = player.Character or player.CharacterAdded:Wait()
-    local humanoid = character:WaitForChild("Humanoid")
-    local rootPart = character:WaitForChild("HumanoidRootPart")
     
-    -- Criar estados de combate se não existirem
-    local combatState = humanoid:FindFirstChild("CombatState")
-    if not combatState then
-        combatState = Instance.new("Folder")
-        combatState.Name = "CombatState"
-        combatState.Parent = humanoid
+    -- Interface melhorada
+    local function createUI()
+        local existingUI = player.PlayerGui:FindFirstChild("EnhancedCombatUI")
+        if existingUI then existingUI:Destroy() end
         
-        -- Criar valores necessários
-        local values = {
-            {"Running", "BoolValue", false},
-            {"Stamina", "NumberValue", 100},
-            {"Blocking", "BoolValue", false},
-            {"BlockHealth", "NumberValue", 100},
-            {"Attacking", "BoolValue", false},
-            {"AttackCooldown", "BoolValue", false},
-            {"LastAttacked", "NumberValue", 0},
-            {"Combo", "IntValue", 1},
-            {"Stunned", "BoolValue", false}
-        }
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "EnhancedCombatUI"
+        screenGui.ResetOnSpawn = false
+        screenGui.Parent = player.PlayerGui
         
-        for _, valueData in pairs(values) do
-            local value = Instance.new(valueData[2])
-            value.Name = valueData[1]
-            value.Value = valueData[3]
-            value.Parent = combatState
+        local mainFrame = Instance.new("Frame")
+        mainFrame.Name = "MainFrame"
+        mainFrame.Size = UDim2.new(0, 350, 0, 400)
+        mainFrame.Position = UDim2.new(0, 20, 0.5, -200)
+        mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        mainFrame.BorderSizePixel = 0
+        mainFrame.Active = true
+        mainFrame.Draggable = true
+        mainFrame.Parent = screenGui
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 12)
+        corner.Parent = mainFrame
+        
+        local header = Instance.new("Frame")
+        header.Name = "Header"
+        header.Size = UDim2.new(1, 0, 0, 50)
+        header.Position = UDim2.new(0, 0, 0, 0)
+        header.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        header.BorderSizePixel = 0
+        header.Parent = mainFrame
+        
+        local headerCorner = Instance.new("UICorner")
+        headerCorner.CornerRadius = UDim.new(0, 12)
+        headerCorner.Parent = header
+        
+        local title = Instance.new("TextLabel")
+        title.Name = "Title"
+        title.Size = UDim2.new(1, -20, 1, 0)
+        title.Position = UDim2.new(0, 10, 0, 0)
+        title.BackgroundTransparency = 1
+        title.Text = "⚔️ ENHANCED COMBAT SYSTEM"
+        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.TextSize = 16
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Font = Enum.Font.GothamBold
+        title.Parent = header
+        
+        local contentFrame = Instance.new("ScrollingFrame")
+        contentFrame.Name = "Content"
+        contentFrame.Size = UDim2.new(1, 0, 1, -60)
+        contentFrame.Position = UDim2.new(0, 0, 0, 60)
+        contentFrame.BackgroundTransparency = 1
+        contentFrame.BorderSizePixel = 0
+        contentFrame.ScrollBarThickness = 4
+        contentFrame.CanvasSize = UDim2.new(0, 0, 0, 350)
+        contentFrame.Parent = mainFrame
+        
+        local contentLayout = Instance.new("UIListLayout")
+        contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        contentLayout.Padding = UDim.new(0, 8)
+        contentLayout.Parent = contentFrame
+        
+        local contentPadding = Instance.new("UIPadding")
+        contentPadding.PaddingAll = UDim.new(0, 15)
+        contentPadding.Parent = contentFrame
+        
+        local function createToggleButton(name, displayName, description, improvement, layoutOrder)
+            local buttonFrame = Instance.new("Frame")
+            buttonFrame.Name = name .. "Frame"
+            buttonFrame.Size = UDim2.new(1, 0, 0, 60)
+            buttonFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            buttonFrame.BorderSizePixel = 0
+            buttonFrame.LayoutOrder = layoutOrder
+            buttonFrame.Parent = contentFrame
+            
+            local buttonCorner = Instance.new("UICorner")
+            buttonCorner.CornerRadius = UDim.new(0, 8)
+            buttonCorner.Parent = buttonFrame
+            
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, -80, 0, 20)
+            nameLabel.Position = UDim2.new(0, 10, 0, 8)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = displayName
+            nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            nameLabel.TextSize = 13
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.Parent = buttonFrame
+            
+            local descLabel = Instance.new("TextLabel")
+            descLabel.Size = UDim2.new(1, -80, 0, 18)
+            descLabel.Position = UDim2.new(0, 10, 0, 28)
+            descLabel.BackgroundTransparency = 1
+            descLabel.Text = description
+            descLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+            descLabel.TextSize = 10
+            descLabel.TextXAlignment = Enum.TextXAlignment.Left
+            descLabel.Font = Enum.Font.Gotham
+            descLabel.Parent = buttonFrame
+            
+            local toggleButton = Instance.new("TextButton")
+            toggleButton.Size = UDim2.new(0, 55, 0, 25)
+            toggleButton.Position = UDim2.new(1, -65, 0.5, -12.5)
+            toggleButton.BackgroundColor3 = improvements[improvement] and Color3.fromRGB(40, 167, 69) or Color3.fromRGB(220, 53, 69)
+            toggleButton.BorderSizePixel = 0
+            toggleButton.Text = improvements[improvement] and "ON" or "OFF"
+            toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            toggleButton.TextSize = 11
+            toggleButton.Font = Enum.Font.GothamBold
+            toggleButton.Parent = buttonFrame
+            
+            local toggleCorner = Instance.new("UICorner")
+            toggleCorner.CornerRadius = UDim.new(0, 12)
+            toggleCorner.Parent = toggleButton
+            
+            toggleButton.MouseButton1Click:Connect(function()
+                improvements[improvement] = not improvements[improvement]
+                
+                local newColor = improvements[improvement] and Color3.fromRGB(40, 167, 69) or Color3.fromRGB(220, 53, 69)
+                local newText = improvements[improvement] and "ON" or "OFF"
+                
+                TweenService:Create(toggleButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = newColor
+                }):Play()
+                
+                toggleButton.Text = newText
+                
+                local statusText = improvements[improvement] and "ATIVADO" or "DESATIVADO"
+                print("🔧 [MELHORIA] " .. displayName .. " " .. statusText)
+            end)
         end
+        
+        createToggleButton("nocooldown", "🚀 Sem Cooldown", "Remove tempo de espera entre ataques", "noCooldown", 1)
+        createToggleButton("hitbox", "🎯 Hitbox Expandida", "2.5x maior alcance dos ataques", "expandedHitbox", 2)
+        createToggleButton("attack", "⚡ Ataque Otimizado", "Dash e velocidade aumentados", "optimizedAttack", 3)
+        createToggleButton("stamina", "♾️ Stamina Infinita", "Stamina sempre no máximo", "autoStamina", 4)
+        createToggleButton("speed", "💨 Movimento Rápido", "Velocidade e pulo aumentados", "fastMovement", 5)
+        createToggleButton("stun", "🛡️ Sem Stun", "Remove tempo de atordoamento", "removeStun", 6)
+        
+        return screenGui
     end
     
-    -- Loop principal das melhorias
-    RunService.Heartbeat:Connect(function()
-        if not character or not character.Parent then return end
+    -- Sistema de chat commands
+    local function handleChatCommand(message)
+        local args = string.split(string.lower(message), " ")
         
-        -- Stamina infinita
-        if improvements.autoStamina and combatState:FindFirstChild("Stamina") then
-            combatState.Stamina.Value = 100
-        end
-        
-        -- Movimento rápido
-        if improvements.fastMovement then
-            humanoid.WalkSpeed = 32
-            humanoid.JumpPower = 75
-        else
-            humanoid.WalkSpeed = 16
-            humanoid.JumpPower = 50
-        end
-        
-        -- Remover cooldown
-        if improvements.noCooldown and combatState:FindFirstChild("AttackCooldown") then
-            combatState.AttackCooldown.Value = false
-        end
-        
-        -- Resetar combo mais rápido para ataques otimizados
-        if improvements.optimizedAttack and combatState:FindFirstChild("LastAttacked") then
-            if tick() - combatState.LastAttacked.Value >= 1 then -- Reduz tempo de combo
-                combatState.Combo.Value = 1
+        if args[1] == "!combat" or args[1] == "!melhoria" then
+            if args[2] == "nocooldown" then
+                improvements.noCooldown = not improvements.noCooldown
+                print("🚀 Sem Cooldown: " .. (improvements.noCooldown and "ATIVADO" or "DESATIVADO"))
+            elseif args[2] == "hitbox" then
+                improvements.expandedHitbox = not improvements.expandedHitbox
+                print("🎯 Hitbox Expandida: " .. (improvements.expandedHitbox and "ATIVADA" or "DESATIVADA"))
+            elseif args[2] == "attack" then
+                improvements.optimizedAttack = not improvements.optimizedAttack
+                print("⚡ Ataque Otimizado: " .. (improvements.optimizedAttack and "ATIVADO" or "DESATIVADO"))
+            elseif args[2] == "stamina" then
+                improvements.autoStamina = not improvements.autoStamina
+                print("♾️ Stamina Infinita: " .. (improvements.autoStamina and "ATIVADA" or "DESATIVADA"))
+            elseif args[2] == "speed" then
+                improvements.fastMovement = not improvements.fastMovement
+                print("💨 Movimento Rápido: " .. (improvements.fastMovement and "ATIVADO" or "DESATIVADO"))
+            elseif args[2] == "stun" then
+                improvements.removeStun = not improvements.removeStun
+                print("🛡️ Sem Stun: " .. (improvements.removeStun and "ATIVADO" or "DESATIVADO"))
+            elseif args[2] == "all" then
+                local state = not improvements.noCooldown
+                for key, _ in pairs(improvements) do
+                    improvements[key] = state
+                end
+                print("🔧 Todas as melhorias: " .. (state and "ATIVADAS" or "DESATIVADAS"))
+            elseif args[2] == "help" or args[2] == "ajuda" then
+                print("=== 🎮 COMANDOS DE COMBATE ===")
+                print("!combat nocooldown - Remove cooldown dos ataques")
+                print("!combat hitbox - Expande hitbox 2.5x")
+                print("!combat attack - Otimiza ataques")
+                print("!combat stamina - Ativa stamina infinita")
+                print("!combat speed - Aumenta velocidade")
+                print("!combat stun - Remove stun")
+                print("!combat all - Liga/desliga tudo")
+                print("!combat status - Mostra status")
+            elseif args[2] == "status" then
+                print("=== 📊 STATUS DAS MELHORIAS ===")
+                for key, value in pairs(improvements) do
+                    local emoji = value and "✅" or "❌"
+                    print(emoji .. " " .. key .. ": " .. (value and "ATIVO" or "INATIVO"))
+                end
             end
         end
-    end)
+    end
     
-    -- Sistema de ataque melhorado
-    local function enhancedAttack()
-        if not combatState then return end
+    -- Sistema de movimento rápido para cada personagem
+    local function setupCharacterEnhancements(character)
+        local humanoid = character:WaitForChild("Humanoid")
+        local rootPart = character:WaitForChild("HumanoidRootPart")
         
-        local attackStaminaCost = improvements.optimizedAttack and 5 or 10
-        
-        if combatState.Stunned.Value == false and 
-           combatState.Attacking.Value == false and 
-           (improvements.noCooldown or combatState.AttackCooldown.Value == false) and
-           combatState.Stamina.Value >= attackStaminaCost then
+        -- Sistema de stamina infinita individual
+        local staminaConnection
+        staminaConnection = RunService.Heartbeat:Connect(function()
+            if not character.Parent then
+                staminaConnection:Disconnect()
+                return
+            end
             
-            combatState.AttackCooldown.Value = true
-            combatState.Attacking.Value = true
-            combatState.Stamina.Value = math.max(0, combatState.Stamina.Value - attackStaminaCost)
-            
-            combatState.Combo.Value = combatState.Combo.Value % 4 + 1
-            combatState.LastAttacked.Value = tick()
-            
-            -- Animação e efeitos
-            task.spawn(function()
-                -- Dash melhorado
-                local direction = rootPart.CFrame.LookVector
-                local dashForce = improvements.optimizedAttack and 20 or 10
-                
-                local bodyVelocity = Instance.new("BodyVelocity")
-                bodyVelocity.MaxForce = Vector3.new(4000, 0, 4000)
-                bodyVelocity.Velocity = direction * dashForce
-                bodyVelocity.Parent = rootPart
-                
-                game:GetService("Debris"):AddItem(bodyVelocity, 0.2)
-                
-                -- Detecção de hit melhorada
-                local hitRange = improvements.expandedHitbox and 15 or 8
-                local hitSize = improvements.expandedHitbox and Vector3.new(8, 8, 8) or Vector3.new(4, 4, 4)
-                
-                local rp = RaycastParams.new()
-                rp.FilterType = Enum.RaycastFilterType.Exclude
-                rp.FilterDescendantsInstances = {character}
-                
-                -- Múltiplos raycasts para hitbox expandida
-                local directions = {
-                    rootPart.CFrame.LookVector,
-                    (rootPart.CFrame * CFrame.Angles(0, math.rad(15), 0)).LookVector,
-                    (rootPart.CFrame * CFrame.Angles(0, math.rad(-15), 0)).LookVector
-                }
-                
-                if improvements.expandedHitbox then
-                    table.insert(directions, (rootPart.CFrame * CFrame.Angles(0, math.rad(30), 0)).LookVector)
-                    table.insert(directions, (rootPart.CFrame * CFrame.Angles(0, math.rad(-30), 0)).LookVector)
-                end
-                
-                for _, dir in pairs(directions) do
-                    local hitResult = workspace:Blockcast(rootPart.CFrame, hitSize, dir * hitRange, rp)
-                    
-                    if hitResult then
-                        local hitChar = hitResult.Instance.Parent
-                        local hitHumanoid = hitChar:FindFirstChild("Humanoid")
-                        
-                        if hitHumanoid and hitChar ~= character and hitHumanoid.Health > 0 then
-                            -- Aplicar dano
-                            local damage = improvements.optimizedAttack and 25 or 15
-                            hitHumanoid:TakeDamage(damage)
-                            
-                            -- Knockback melhorado
-                            local knockbackForce = improvements.optimizedAttack and 50 or 30
-                            local hitRoot = hitChar:FindFirstChild("HumanoidRootPart")
-                            
-                            if hitRoot then
-                                local bodyVel = Instance.new("BodyVelocity")
-                                bodyVel.MaxForce = Vector3.new(4000, 0, 4000)
-                                bodyVel.Velocity = dir * knockbackForce
-                                bodyVel.Parent = hitRoot
-                                
-                                game:GetService("Debris"):AddItem(bodyVel, 0.3)
-                            end
-                            
-                            -- Efeito visual
-                            local effect = Instance.new("Explosion")
-                            effect.Parent = workspace
-                            effect.Position = hitResult.Position
-                            effect.BlastRadius = 0
-                            effect.BlastPressure = 0
-                            effect.Visible = false
-                            
-                            break
-                        end
+            local combatState = humanoid:FindFirstChild("CombatState")
+            if combatState then
+                -- Stamina infinita
+                if improvements.autoStamina then
+                    local stamina = combatState:FindFirstChild("Stamina")
+                    if stamina and stamina:IsA("NumberValue") then
+                        stamina.Value = config.Stamina.MaxStamina.Value
                     end
                 end
                 
-                -- Duração do ataque
-                local attackDuration = improvements.optimizedAttack and 0.3 or 0.5
-                task.wait(attackDuration)
-                
-                combatState.Attacking.Value = false
-                
-                -- Cooldown
-                if not improvements.noCooldown then
-                    local cooldownTime = improvements.optimizedAttack and 0.2 or 0.5
-                    task.wait(cooldownTime)
+                -- Remover stun instantaneamente
+                if improvements.removeStun then
+                    local stunned = combatState:FindFirstChild("Stunned")
+                    if stunned and stunned:IsA("BoolValue") and stunned.Value then
+                        stunned.Value = false
+                    end
                 end
-                
-                combatState.AttackCooldown.Value = false
-            end)
-        end
+            end
+            
+            -- Movimento rápido
+            if improvements.fastMovement then
+                humanoid.WalkSpeed = 50
+                humanoid.JumpHeight = 25
+            else
+                -- Restaurar valores normais baseados na configuração
+                if config:FindFirstChild("Walking") and config.Walking:FindFirstChild("Speed") then
+                    humanoid.WalkSpeed = config.Walking.Speed.Value
+                end
+            end
+        end)
     end
     
-    -- Input handling
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
+    -- Inicialização
+    local function initialize()
+        -- Salvar valores originais primeiro
+        saveOriginalValues()
         
-        if input.KeyCode == Enum.KeyCode.F then
-            enhancedAttack()
-        elseif input.KeyCode == Enum.KeyCode.G then
-            if combatState:FindFirstChild("Blocking") then
-                combatState.Blocking.Value = not combatState.Blocking.Value
-            end
+        -- Criar interface
+        createUI()
+        
+        -- Aplicar melhorias contínuas nas configurações
+        applyImprovements()
+        
+        -- Setup para personagem atual
+        if player.Character then
+            setupCharacterEnhancements(player.Character)
+        end
+        
+        -- Setup para novos personagens
+        player.CharacterAdded:Connect(function(character)
+            setupCharacterEnhancements(character)
+        end)
+        
+        -- Conectar comandos de chat
+        player.Chatted:Connect(handleChatCommand)
+        
+        print("⚔️ ===== ENHANCED COMBAT SYSTEM LOADED ===== ⚔️")
+        print("🎮 Sistema carregado e modificando configurações do jogo!")
+        print("💬 Digite !combat help para ver comandos")
+        print("🔧 Interface gráfica disponível!")
+    end
+    
+    -- Limpeza ao sair
+    game.Players.PlayerRemoving:Connect(function(plr)
+        if plr == player then
+            _G.CombatSystemLoaded = false
         end
     end)
-end
-
--- Conectar eventos
-player.Chatted:Connect(handleChatCommand)
-
-player.CharacterAdded:Connect(function()
-    wait(1) -- Aguardar carregamento completo
-    setupEnhancedCombat()
+    
+    initialize()
+    return true
 end)
 
--- Setup inicial
-if player.Character then
-    setupEnhancedCombat()
+if not success then
+    warn("❌ Erro ao carregar sistema: " .. tostring(result))
+else
+    print("✅ Sistema carregado com sucesso!")
 end
-
--- Criar interface
-createCommandInterface()
-
-print("=== SISTEMA DE COMBATE MELHORADO CARREGADO ===")
-print("Pressione F para atacar, G para bloquear")
-print("Use !melhoria help para ver todos os comandos")
-print("Interface gráfica disponível no canto superior esquerdo")
