@@ -96,8 +96,8 @@ local success, result = pcall(function()
                         if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
                             for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
                                 if cooldown:IsA("NumberValue") then
-                                    cooldown.Value = 0.01 -- Quase zero
-                                    print("🚀 Cooldown zerado:", cooldown.Name)
+                                    cooldown.Value = 0 -- ZERO ABSOLUTO
+                                    print("🚀 Cooldown REMOVIDO:", cooldown.Name, "-> 0")
                                 end
                             end
                         end
@@ -139,16 +139,16 @@ local success, result = pcall(function()
                     if improvements.autoStamina then
                         if config:FindFirstChild("Stamina") then
                             if config.Stamina:FindFirstChild("AttackStaminaCost") then
-                                config.Stamina.AttackStaminaCost.Value = 0
-                                print("♾️ Stamina cost zerado")
+                                config.Stamina.AttackStaminaCost.Value = 0 -- ZERO ABSOLUTO
+                                print("♾️ Stamina cost REMOVIDO -> 0")
                             end
                             if config.Stamina:FindFirstChild("StaminaDecreaseRate") then
-                                config.Stamina.StaminaDecreaseRate.Value = 0
-                                print("♾️ Stamina decrease zerado")
+                                config.Stamina.StaminaDecreaseRate.Value = 0 -- ZERO ABSOLUTO
+                                print("♾️ Stamina decrease REMOVIDO -> 0")
                             end
                             if config.Stamina:FindFirstChild("StaminaIncreaseRate") then
-                                config.Stamina.StaminaIncreaseRate.Value = 1000
-                                print("♾️ Stamina regen aumentado")
+                                config.Stamina.StaminaIncreaseRate.Value = 1000 -- REGENERAÇÃO ALTA
+                                print("♾️ Stamina regen AUMENTADO -> 1000")
                             end
                         end
                     else
@@ -163,8 +163,8 @@ local success, result = pcall(function()
                         if config:FindFirstChild("Stunned") and config.Stunned:FindFirstChild("StunDurations") then
                             for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
                                 if stun:IsA("NumberValue") then
-                                    stun.Value = 0.01 -- Quase zero
-                                    print("🛡️ Stun removido:", stun.Name)
+                                    stun.Value = 0 -- ZERO ABSOLUTO
+                                    print("🛡️ Stun REMOVIDO:", stun.Name, "-> 0")
                                 end
                             end
                         end
