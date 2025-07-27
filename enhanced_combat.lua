@@ -1,313 +1,554 @@
+-- Enhanced Hitbox Script with GUI
+-- Execute via: loadstring(game:HttpGet('https://github.com/Matheus33321/enhanced-combat-script/blob/main/enhanced_hitbox.lua'))()
 
--- Enhanced Hitbox Script for Roblox - Menu Configuration
--- Menu interativo para configurar hitbox e visibilidade
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
-local ENHANCED_CONFIG = {
-    -- Multiplicadores de range para cada combo
-    rangeMultipliers = {
-        [1] = 3.0,  -- Primeiro ataque: 3x o range original
-        [2] = 3.5,  -- Segundo ataque: 3.5x o range original
-        [3] = 4.0,  -- Terceiro ataque: 4x o range original
-        [4] = 4.5,  -- Quarto ataque: 4.5x o range original
-    },
-    
-    -- Range máximo garantido (em studs)
-    maxGuaranteedRange = 20,
-    
-    -- Ângulo de detecção (em graus) - 360 = detecção completa ao redor
-    detectionAngle = 180,
-    
-    -- Altura de detecção (para cima e para baixo)
-    verticalRange = 10,
-    
-    -- Se deve ignorar paredes/obstáculos
-    ignoreObstacles = true,
-    
-    -- Priorizar alvos mais próximos
-    prioritizeClosest = true,
-    
-    -- Auto-hit (sempre acerta independente da distância)
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Configurações padrão
+local config = {
+    hitboxSize = 10,
+    hitboxTransparency = 0.7,
+    hitboxColor = Color3.fromRGB(255, 0, 0),
+    visualizeHitbox = true,
     autoHit = true,
-    
-    -- Visibilidade da hitbox
-    showHitbox = false,
-    
-    -- Cor da hitbox visual
-    hitboxColor = {r = 1, g = 0, b = 0}, -- Vermelho
-    
-    -- Transparência da hitbox (0 = opaco, 1 = transparente)
-    hitboxTransparency = 0.5
+    hitboxMultiplier = 2,
+    maxTargets = 3,
+    hitboxRange = 25,
+    bypassBlock = false
 }
 
--- Sistema de Menu
-local Menu = {}
+-- Variáveis globais
+local hitboxGui
+local hitboxPart
+local originalHitDetection
+local connections = {}
 
-function Menu:new()
-    local menu = {
-        isVisible = false,
-        options = {
-            "1. Configurar Range Multiplier",
-            "2. Configurar Range Máximo",
-            "3. Configurar Ângulo de Detecção",
-            "4. Toggle Auto-Hit",
-            "5. Toggle Visibilidade da Hitbox",
-            "6. Configurar Cor da Hitbox",
-            "7. Configurar Transparência",
-            "8. Mostrar Configurações Atuais",
-            "9. Resetar Configurações",
-            "0. Sair"
+-- Função para criar a GUI
+local function createGUI()
+    -- Remover GUI existente se houver
+    if hitboxGui then
+        hitboxGui:Destroy()
+    end
+    
+    -- Crear ScreenGui principal
+    hitboxGui = Instance.new("ScreenGui")
+    hitboxGui.Name = "EnhancedHitboxGUI"
+    hitboxGui.ResetOnSpawn = false
+    hitboxGui.Parent = playerGui
+    
+    -- Frame principal
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 400, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.Parent = hitboxGui
+    
+    -- Cantos arredondados
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = mainFrame
+    
+    -- Título
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Size = UDim2.new(1, 0, 0, 40)
+    titleLabel.Position = UDim2.new(0, 0, 0, 0)
+    titleLabel.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    titleLabel.Text = "Enhanced Hitbox GUI"
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextScaled = true
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Parent = mainFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+    
+    -- Botão fechar
+    local closeButton = Instance.new("TextButton")
+    closeButton.Name = "CloseButton"
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -35, 0, 5)
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.TextScaled = true
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Parent = mainFrame
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 5)
+    closeCorner.Parent = closeButton
+    
+    -- ScrollingFrame para os controles
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Name = "ScrollFrame"
+    scrollFrame.Size = UDim2.new(1, -20, 1, -60)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 50)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.ScrollBarThickness = 8
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
+    scrollFrame.Parent = mainFrame
+    
+    -- Layout
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 10)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scrollFrame
+    
+    -- Função para criar controles
+    local function createSlider(name, minValue, maxValue, currentValue, callback)
+        local sliderFrame = Instance.new("Frame")
+        sliderFrame.Name = name .. "Frame"
+        sliderFrame.Size = UDim2.new(1, 0, 0, 80)
+        sliderFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        sliderFrame.BorderSizePixel = 0
+        sliderFrame.Parent = scrollFrame
+        
+        local sliderCorner = Instance.new("UICorner")
+        sliderCorner.CornerRadius = UDim.new(0, 8)
+        sliderCorner.Parent = sliderFrame
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 0, 30)
+        label.Position = UDim2.new(0, 0, 0, 5)
+        label.BackgroundTransparency = 1
+        label.Text = name .. ": " .. tostring(currentValue)
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextScaled = true
+        label.Font = Enum.Font.Gotham
+        label.Parent = sliderFrame
+        
+        local sliderBG = Instance.new("Frame")
+        sliderBG.Size = UDim2.new(1, -20, 0, 20)
+        sliderBG.Position = UDim2.new(0, 10, 0, 40)
+        sliderBG.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        sliderBG.BorderSizePixel = 0
+        sliderBG.Parent = sliderFrame
+        
+        local sliderBGCorner = Instance.new("UICorner")
+        sliderBGCorner.CornerRadius = UDim.new(0, 10)
+        sliderBGCorner.Parent = sliderBG
+        
+        local sliderButton = Instance.new("TextButton")
+        sliderButton.Size = UDim2.new(0, 20, 1, 0)
+        sliderButton.Position = UDim2.new((currentValue - minValue) / (maxValue - minValue), -10, 0, 0)
+        sliderButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        sliderButton.Text = ""
+        sliderButton.Parent = sliderBG
+        
+        local buttonCorner = Instance.new("UICorner")
+        buttonCorner.CornerRadius = UDim.new(1, 0)
+        buttonCorner.Parent = sliderButton
+        
+        local dragging = false
+        
+        sliderButton.MouseButton1Down:Connect(function()
+            dragging = true
+        end)
+        
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+        
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local mouse = Players.LocalPlayer:GetMouse()
+                local relativeX = mouse.X - sliderBG.AbsolutePosition.X
+                local percentage = math.clamp(relativeX / sliderBG.AbsoluteSize.X, 0, 1)
+                local value = minValue + (maxValue - minValue) * percentage
+                
+                sliderButton.Position = UDim2.new(percentage, -10, 0, 0)
+                label.Text = name .. ": " .. string.format("%.1f", value)
+                callback(value)
+            end
+        end)
+        
+        return sliderFrame
+    end
+    
+    local function createToggle(name, currentValue, callback)
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.Name = name .. "Frame"
+        toggleFrame.Size = UDim2.new(1, 0, 0, 50)
+        toggleFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        toggleFrame.BorderSizePixel = 0
+        toggleFrame.Parent = scrollFrame
+        
+        local toggleCorner = Instance.new("UICorner")
+        toggleCorner.CornerRadius = UDim.new(0, 8)
+        toggleCorner.Parent = toggleFrame
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0.7, 0, 1, 0)
+        label.Position = UDim2.new(0, 10, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = name
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextScaled = true
+        label.Font = Enum.Font.Gotham
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = toggleFrame
+        
+        local toggleButton = Instance.new("TextButton")
+        toggleButton.Size = UDim2.new(0, 80, 0, 30)
+        toggleButton.Position = UDim2.new(1, -90, 0.5, -15)
+        toggleButton.BackgroundColor3 = currentValue and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        toggleButton.Text = currentValue and "ON" or "OFF"
+        toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        toggleButton.TextScaled = true
+        toggleButton.Font = Enum.Font.GothamBold
+        toggleButton.Parent = toggleFrame
+        
+        local toggleCorner2 = Instance.new("UICorner")
+        toggleCorner2.CornerRadius = UDim.new(0, 15)
+        toggleCorner2.Parent = toggleButton
+        
+        toggleButton.MouseButton1Click:Connect(function()
+            currentValue = not currentValue
+            toggleButton.BackgroundColor3 = currentValue and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+            toggleButton.Text = currentValue and "ON" or "OFF"
+            callback(currentValue)
+        end)
+        
+        return toggleFrame
+    end
+    
+    local function createColorPicker(name, currentColor, callback)
+        local colorFrame = Instance.new("Frame")
+        colorFrame.Name = name .. "Frame"
+        colorFrame.Size = UDim2.new(1, 0, 0, 100)
+        colorFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        colorFrame.BorderSizePixel = 0
+        colorFrame.Parent = scrollFrame
+        
+        local colorCorner = Instance.new("UICorner")
+        colorCorner.CornerRadius = UDim.new(0, 8)
+        colorCorner.Parent = colorFrame
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 0, 30)
+        label.Position = UDim2.new(0, 0, 0, 5)
+        label.BackgroundTransparency = 1
+        label.Text = name
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextScaled = true
+        label.Font = Enum.Font.Gotham
+        label.Parent = colorFrame
+        
+        local colorPreview = Instance.new("Frame")
+        colorPreview.Size = UDim2.new(0, 60, 0, 30)
+        colorPreview.Position = UDim2.new(0, 10, 0, 40)
+        colorPreview.BackgroundColor3 = currentColor
+        colorPreview.BorderSizePixel = 0
+        colorPreview.Parent = colorFrame
+        
+        local previewCorner = Instance.new("UICorner")
+        previewCorner.CornerRadius = UDim.new(0, 5)
+        previewCorner.Parent = colorPreview
+        
+        -- Botões de cor predefinidas
+        local colors = {
+            Color3.fromRGB(255, 0, 0),   -- Vermelho
+            Color3.fromRGB(0, 255, 0),   -- Verde
+            Color3.fromRGB(0, 0, 255),   -- Azul
+            Color3.fromRGB(255, 255, 0), -- Amarelo
+            Color3.fromRGB(255, 0, 255), -- Magenta
+            Color3.fromRGB(0, 255, 255)  -- Ciano
         }
-    }
-    setmetatable(menu, {__index = self})
-    return menu
-end
-
-function Menu:show()
-    print("\n" .. string.rep("=", 50))
-    print("🎯 ENHANCED HITBOX - MENU DE CONFIGURAÇÃO")
-    print(string.rep("=", 50))
-    
-    for _, option in ipairs(self.options) do
-        print(option)
-    end
-    
-    print(string.rep("=", 50))
-    print("Digite o número da opção desejada:")
-end
-
-function Menu:showCurrentConfig()
-    print("\n📊 CONFIGURAÇÕES ATUAIS:")
-    print("------------------------")
-    print("Range Multipliers:")
-    for combo, mult in pairs(ENHANCED_CONFIG.rangeMultipliers) do
-        print(string.format("  Combo %d: %.1fx", combo, mult))
-    end
-    print(string.format("Range Máximo: %d studs", ENHANCED_CONFIG.maxGuaranteedRange))
-    print(string.format("Ângulo de Detecção: %d°", ENHANCED_CONFIG.detectionAngle))
-    print(string.format("Auto-Hit: %s", ENHANCED_CONFIG.autoHit and "ATIVADO" or "DESATIVADO"))
-    print(string.format("Hitbox Visível: %s", ENHANCED_CONFIG.showHitbox and "SIM" or "NÃO"))
-    print(string.format("Cor da Hitbox: R=%.1f G=%.1f B=%.1f", 
-          ENHANCED_CONFIG.hitboxColor.r, 
-          ENHANCED_CONFIG.hitboxColor.g, 
-          ENHANCED_CONFIG.hitboxColor.b))
-    print(string.format("Transparência: %.1f", ENHANCED_CONFIG.hitboxTransparency))
-end
-
-function Menu:configureRangeMultiplier()
-    print("\n🎯 CONFIGURAR RANGE MULTIPLIER")
-    print("Qual combo você quer alterar? (1-4):")
-    local combo = tonumber(io.read())
-    
-    if combo and combo >= 1 and combo <= 4 then
-        print(string.format("Multiplicador atual para combo %d: %.1fx", combo, ENHANCED_CONFIG.rangeMultipliers[combo]))
-        print("Digite o novo multiplicador (ex: 5.0):")
-        local multiplier = tonumber(io.read())
         
-        if multiplier and multiplier > 0 then
-            ENHANCED_CONFIG.rangeMultipliers[combo] = multiplier
-            print(string.format("✅ Multiplicador do combo %d alterado para %.1fx", combo, multiplier))
+        for i, color in ipairs(colors) do
+            local colorButton = Instance.new("TextButton")
+            colorButton.Size = UDim2.new(0, 25, 0, 25)
+            colorButton.Position = UDim2.new(0, 80 + (i - 1) * 30, 0, 45)
+            colorButton.BackgroundColor3 = color
+            colorButton.Text = ""
+            colorButton.BorderSizePixel = 0
+            colorButton.Parent = colorFrame
+            
+            local buttonCorner = Instance.new("UICorner")
+            buttonCorner.CornerRadius = UDim.new(0, 5)
+            buttonCorner.Parent = colorButton
+            
+            colorButton.MouseButton1Click:Connect(function()
+                colorPreview.BackgroundColor3 = color
+                callback(color)
+            end)
+        end
+        
+        return colorFrame
+    end
+    
+    -- Criar controles
+    createSlider("Tamanho da Hitbox", 5, 50, config.hitboxSize, function(value)
+        config.hitboxSize = value
+        updateHitbox()
+    end)
+    
+    createSlider("Transparência", 0, 1, config.hitboxTransparency, function(value)
+        config.hitboxTransparency = value
+        updateHitbox()
+    end)
+    
+    createSlider("Multiplicador de Range", 1, 5, config.hitboxMultiplier, function(value)
+        config.hitboxMultiplier = value
+    end)
+    
+    createSlider("Alcance Máximo", 10, 100, config.hitboxRange, function(value)
+        config.hitboxRange = value
+    end)
+    
+    createSlider("Máximo de Alvos", 1, 10, config.maxTargets, function(value)
+        config.maxTargets = math.floor(value)
+    end)
+    
+    createToggle("Visualizar Hitbox", config.visualizeHitbox, function(value)
+        config.visualizeHitbox = value
+        updateHitbox()
+    end)
+    
+    createToggle("Auto Hit Ativado", config.autoHit, function(value)
+        config.autoHit = value
+        if value then
+            setupHitboxHook()
         else
-            print("❌ Valor inválido!")
+            removeHitboxHook()
         end
-    else
-        print("❌ Combo inválido!")
-    end
-end
-
-function Menu:configureMaxRange()
-    print("\n📏 CONFIGURAR RANGE MÁXIMO")
-    print(string.format("Range máximo atual: %d studs", ENHANCED_CONFIG.maxGuaranteedRange))
-    print("Digite o novo range máximo:")
-    local range = tonumber(io.read())
+    end)
     
-    if range and range > 0 then
-        ENHANCED_CONFIG.maxGuaranteedRange = range
-        print(string.format("✅ Range máximo alterado para %d studs", range))
-    else
-        print("❌ Valor inválido!")
-    end
-end
-
-function Menu:configureAngle()
-    print("\n🔄 CONFIGURAR ÂNGULO DE DETECÇÃO")
-    print(string.format("Ângulo atual: %d°", ENHANCED_CONFIG.detectionAngle))
-    print("Digite o novo ângulo (0-360):")
-    local angle = tonumber(io.read())
+    createToggle("Bypass Block", config.bypassBlock, function(value)
+        config.bypassBlock = value
+    end)
     
-    if angle and angle >= 0 and angle <= 360 then
-        ENHANCED_CONFIG.detectionAngle = angle
-        print(string.format("✅ Ângulo alterado para %d°", angle))
-    else
-        print("❌ Ângulo inválido! Digite um valor entre 0 e 360.")
-    end
-end
-
-function Menu:toggleAutoHit()
-    ENHANCED_CONFIG.autoHit = not ENHANCED_CONFIG.autoHit
-    print(string.format("✅ Auto-Hit %s", ENHANCED_CONFIG.autoHit and "ATIVADO" or "DESATIVADO"))
-end
-
-function Menu:toggleHitboxVisibility()
-    ENHANCED_CONFIG.showHitbox = not ENHANCED_CONFIG.showHitbox
-    print(string.format("✅ Visibilidade da Hitbox %s", ENHANCED_CONFIG.showHitbox and "ATIVADA" or "DESATIVADA"))
-end
-
-function Menu:configureHitboxColor()
-    print("\n🎨 CONFIGURAR COR DA HITBOX")
-    print("Digite os valores RGB (0-1):")
+    createColorPicker("Cor da Hitbox", config.hitboxColor, function(color)
+        config.hitboxColor = color
+        updateHitbox()
+    end)
     
-    print("Vermelho (R):")
-    local r = tonumber(io.read())
-    print("Verde (G):")
-    local g = tonumber(io.read())
-    print("Azul (B):")
-    local b = tonumber(io.read())
+    -- Eventos do botão fechar
+    closeButton.MouseButton1Click:Connect(function()
+        hitboxGui.Enabled = not hitboxGui.Enabled
+    end)
     
-    if r and g and b and r >= 0 and r <= 1 and g >= 0 and g <= 1 and b >= 0 and b <= 1 then
-        ENHANCED_CONFIG.hitboxColor = {r = r, g = g, b = b}
-        print(string.format("✅ Cor alterada para R=%.1f G=%.1f B=%.1f", r, g, b))
-    else
-        print("❌ Valores inválidos! Use valores entre 0 e 1.")
-    end
-end
-
-function Menu:configureTransparency()
-    print("\n👻 CONFIGURAR TRANSPARÊNCIA")
-    print(string.format("Transparência atual: %.1f", ENHANCED_CONFIG.hitboxTransparency))
-    print("Digite a nova transparência (0-1, onde 0=opaco e 1=transparente):")
-    local transparency = tonumber(io.read())
-    
-    if transparency and transparency >= 0 and transparency <= 1 then
-        ENHANCED_CONFIG.hitboxTransparency = transparency
-        print(string.format("✅ Transparência alterada para %.1f", transparency))
-    else
-        print("❌ Valor inválido! Use um valor entre 0 e 1.")
-    end
-end
-
-function Menu:resetConfig()
-    print("\n🔄 RESETAR CONFIGURAÇÕES")
-    print("Tem certeza que deseja resetar todas as configurações? (s/n)")
-    local confirm = io.read():lower()
-    
-    if confirm == "s" or confirm == "sim" then
-        ENHANCED_CONFIG.rangeMultipliers = {[1] = 3.0, [2] = 3.5, [3] = 4.0, [4] = 4.5}
-        ENHANCED_CONFIG.maxGuaranteedRange = 20
-        ENHANCED_CONFIG.detectionAngle = 180
-        ENHANCED_CONFIG.autoHit = true
-        ENHANCED_CONFIG.showHitbox = false
-        ENHANCED_CONFIG.hitboxColor = {r = 1, g = 0, b = 0}
-        ENHANCED_CONFIG.hitboxTransparency = 0.5
-        print("✅ Configurações resetadas para os valores padrão!")
-    else
-        print("❌ Operação cancelada.")
-    end
-end
-
-function Menu:handleOption(option)
-    if option == "1" then
-        self:configureRangeMultiplier()
-    elseif option == "2" then
-        self:configureMaxRange()
-    elseif option == "3" then
-        self:configureAngle()
-    elseif option == "4" then
-        self:toggleAutoHit()
-    elseif option == "5" then
-        self:toggleHitboxVisibility()
-    elseif option == "6" then
-        self:configureHitboxColor()
-    elseif option == "7" then
-        self:configureTransparency()
-    elseif option == "8" then
-        self:showCurrentConfig()
-    elseif option == "9" then
-        self:resetConfig()
-    elseif option == "0" then
-        return false
-    else
-        print("❌ Opção inválida!")
-    end
-    return true
-end
-
--- Função para gerar código Roblox com as configurações atuais
-function generateRobloxScript()
-    local script = string.format([[
--- Enhanced Hitbox Script - Configurado via Menu
--- Configurações atuais aplicadas
-
-local ENHANCED_CONFIG = {
-    rangeMultipliers = {
-        [1] = %.1f,
-        [2] = %.1f,
-        [3] = %.1f,
-        [4] = %.1f,
-    },
-    maxGuaranteedRange = %d,
-    detectionAngle = %d,
-    verticalRange = 10,
-    ignoreObstacles = true,
-    prioritizeClosest = true,
-    autoHit = %s,
-    showHitbox = %s,
-    hitboxColor = Color3.fromRGB(%d, %d, %d),
-    hitboxTransparency = %.1f
-}
-
--- [Resto do código do Enhanced Hitbox seria inserido aqui]
--- Para usar no Roblox: loadstring(game:HttpGet("URL_DO_SCRIPT"))()
-
-print("🎯 Enhanced Hitbox Configurado!")
-print("📊 Configurações aplicadas:")
-for combo, mult in pairs(ENHANCED_CONFIG.rangeMultipliers) do
-    print("   Combo " .. combo .. ": " .. mult .. "x")
-end
-print("   Range máximo: " .. ENHANCED_CONFIG.maxGuaranteedRange .. " studs")
-print("   Auto-hit: " .. (ENHANCED_CONFIG.autoHit and "ATIVADO" or "DESATIVADO"))
-print("   Hitbox visível: " .. (ENHANCED_CONFIG.showHitbox and "SIM" or "NÃO"))
-]], 
-    ENHANCED_CONFIG.rangeMultipliers[1],
-    ENHANCED_CONFIG.rangeMultipliers[2], 
-    ENHANCED_CONFIG.rangeMultipliers[3],
-    ENHANCED_CONFIG.rangeMultipliers[4],
-    ENHANCED_CONFIG.maxGuaranteedRange,
-    ENHANCED_CONFIG.detectionAngle,
-    ENHANCED_CONFIG.autoHit and "true" or "false",
-    ENHANCED_CONFIG.showHitbox and "true" or "false",
-    math.floor(ENHANCED_CONFIG.hitboxColor.r * 255),
-    math.floor(ENHANCED_CONFIG.hitboxColor.g * 255),
-    math.floor(ENHANCED_CONFIG.hitboxColor.b * 255),
-    ENHANCED_CONFIG.hitboxTransparency)
-    
-    return script
-end
-
--- Loop principal do menu
-function runMenu()
-    local menu = Menu:new()
-    
-    print("🎯 ENHANCED HITBOX - CONFIGURADOR")
-    print("Bem-vindo ao configurador de hitbox!")
-    
-    while true do
-        menu:show()
-        local option = io.read()
-        
-        if not menu:handleOption(option) then
-            break
+    -- Toggle GUI com tecla
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.Insert then
+            hitboxGui.Enabled = not hitboxGui.Enabled
         end
-        
-        print("\nPressione Enter para continuar...")
-        io.read()
-    end
-    
-    print("\n💾 SCRIPT GERADO:")
-    print(string.rep("=", 60))
-    print(generateRobloxScript())
-    print(string.rep("=", 60))
-    print("✅ Configuração concluída! Copie o script acima para usar no Roblox.")
+    end)
 end
 
--- Executar o menu
-runMenu()
+-- Função para atualizar a hitbox visual
+function updateHitbox()
+    if hitboxPart then
+        hitboxPart.Size = Vector3.new(config.hitboxSize, config.hitboxSize, config.hitboxSize)
+        hitboxPart.Transparency = config.hitboxTransparency
+        hitboxPart.Color = config.hitboxColor
+        hitboxPart.Visible = config.visualizeHitbox
+    end
+end
+
+-- Função para criar a hitbox visual
+local function createHitboxVisual()
+    if hitboxPart then
+        hitboxPart:Destroy()
+    end
+    
+    if not config.visualizeHitbox then
+        return
+    end
+    
+    hitboxPart = Instance.new("Part")
+    hitboxPart.Name = "HitboxVisual"
+    hitboxPart.Size = Vector3.new(config.hitboxSize, config.hitboxSize, config.hitboxSize)
+    hitboxPart.Material = Enum.Material.ForceField
+    hitboxPart.BrickColor = BrickColor.new("Really red")
+    hitboxPart.Color = config.hitboxColor
+    hitboxPart.Transparency = config.hitboxTransparency
+    hitboxPart.CanCollide = false
+    hitboxPart.Anchored = true
+    hitboxPart.Shape = Enum.PartType.Ball
+    hitboxPart.TopSurface = Enum.SurfaceType.Smooth
+    hitboxPart.BottomSurface = Enum.SurfaceType.Smooth
+    hitboxPart.Parent = workspace
+    
+    -- Efeito de brilho
+    local selectionBox = Instance.new("SelectionBox")
+    selectionBox.Adornee = hitboxPart
+    selectionBox.Color3 = config.hitboxColor
+    selectionBox.LineThickness = 0.2
+    selectionBox.Transparency = 0.5
+    selectionBox.Parent = hitboxPart
+end
+
+-- Função para encontrar inimigos próximos aprimorada
+local function findNearbyEnemies(attackerChar, range)
+    local attackerRoot = attackerChar.HumanoidRootPart
+    local attackerPos = attackerRoot.Position
+    local enemies = {}
+    
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and obj ~= attackerChar then
+            local targetRoot = obj.HumanoidRootPart
+            local targetPos = targetRoot.Position
+            local distance = (attackerPos - targetPos).Magnitude
+            
+            if distance <= range then
+                table.insert(enemies, {
+                    character = obj,
+                    distance = distance,
+                    position = targetPos
+                })
+            end
+        end
+    end
+    
+    table.sort(enemies, function(a, b) return a.distance < b.distance end)
+    return enemies
+end
+
+-- Função principal de hook do sistema de hit
+function setupHitboxHook()
+    if not config.autoHit then return end
+    
+    local character = player.Character
+    if not character then return end
+    
+    -- Hook no sistema de combate
+    connections.hitboxHook = RunService.Heartbeat:Connect(function()
+        if not config.autoHit then return end
+        
+        local char = player.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        
+        local humanoid = char:FindFirstChild("Humanoid")
+        if not humanoid then return end
+        
+        local combatState = humanoid:FindFirstChild("CombatState")
+        if not combatState or not combatState:FindFirstChild("Attacking") then return end
+        
+        if combatState.Attacking.Value then
+            local root = char.HumanoidRootPart
+            
+            -- Atualizar posição da hitbox visual
+            if hitboxPart and config.visualizeHitbox then
+                hitboxPart.Position = root.Position + root.CFrame.LookVector * (config.hitboxSize / 4)
+            end
+            
+            -- Procurar inimigos próximos
+            local enemies = findNearbyEnemies(char, config.hitboxRange * config.hitboxMultiplier)
+            local hitCount = 0
+            
+            for _, enemy in pairs(enemies) do
+                if hitCount >= config.maxTargets then break end
+                
+                local enemyChar = enemy.character
+                local enemyHum = enemyChar.Humanoid
+                
+                if enemyHum.Health > 0 then
+                    -- Simular hit
+                    local args = {
+                        [1] = enemyChar,
+                        [2] = config.bypassBlock,
+                        [3] = root.CFrame.LookVector
+                    }
+                    
+                    -- Tentar chamar o evento de dano se existir
+                    pcall(function()
+                        local rs = game:GetService("ReplicatedStorage")
+                        if rs:FindFirstChild("Events") and rs.Events:FindFirstChild("DealDamage") then
+                            rs.Events.DealDamage:FireServer(unpack(args))
+                        end
+                    end)
+                    
+                    hitCount = hitCount + 1
+                end
+            end
+        end
+    end)
+end
+
+-- Função para remover o hook
+function removeHitboxHook()
+    if connections.hitboxHook then
+        connections.hitboxHook:Disconnect()
+        connections.hitboxHook = nil
+    end
+end
+
+-- Função para atualizar a hitbox visual em tempo real
+local function updateHitboxPosition()
+    connections.visualUpdate = RunService.Heartbeat:Connect(function()
+        if hitboxPart and config.visualizeHitbox and player.Character then
+            local char = player.Character
+            local root = char:FindFirstChild("HumanoidRootPart")
+            
+            if root then
+                hitboxPart.Position = root.Position + root.CFrame.LookVector * (config.hitboxSize / 4)
+            end
+        end
+    end)
+end
+
+-- Função de limpeza
+local function cleanup()
+    for _, connection in pairs(connections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    
+    if hitboxPart then
+        hitboxPart:Destroy()
+    end
+    
+    if hitboxGui then
+        hitboxGui:Destroy()
+    end
+end
+
+-- Event para quando o player spawna
+local function onCharacterAdded(character)
+    wait(1) -- Aguardar o character carregar completamente
+    
+    if config.visualizeHitbox then
+        createHitboxVisual()
+        updateHitboxPosition()
+    end
+    
+    if config.autoHit then
+        setupHitboxHook()
+    end
+end
+
+-- Conectar eventos
+player.CharacterAdded:Connect(onCharacterAdded)
+
+-- Se o character já existe
+if player.Character then
+    onCharacterAdded(player.Character)
+end
+
+-- Criar GUI
+createGUI()
+
+-- Limpar ao sair
+game.Players.PlayerRemoving:Connect(function(plr)
+    if plr == player then
+        cleanup()
+    end
+end)
+
+print("Enhanced Hitbox GUI carregado! Pressione INSERT para abrir/fechar o menu.")
+print("Criado por: Enhanced Combat Script")
