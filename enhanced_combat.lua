@@ -1,328 +1,335 @@
--- Combat System Explorer - Mapeia a estrutura real do jogo
--- Este script vai mostrar EXATAMENTE como seu sistema funciona
+-- Enhanced Combat System with Improvements
+-- Versão melhorada para fins de teste
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
 
--- Limpar GUIs existentes
-for _, gui in pairs(playerGui:GetChildren()) do
-    if gui.Name:find("Combat") then
-        gui:Destroy()
+-- Configurações das melhorias
+local improvements = {
+    noCooldown = false,
+    expandedHitbox = false,
+    optimizedAttack = false,
+    autoStamina = false,
+    fastMovement = false
+}
+
+-- Interface de comando
+local function createCommandInterface()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "CombatImprovements"
+    gui.Parent = player:WaitForChild("PlayerGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 400)
+    frame.Position = UDim2.new(0, 10, 0.5, -200)
+    frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+    
+    -- Título
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    title.BorderSizePixel = 0
+    title.Text = "MELHORIAS DE COMBATE"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.TextScaled = true
+    title.Font = Enum.Font.SourceSansBold
+    title.Parent = frame
+    
+    local yPos = 60
+    local buttonHeight = 40
+    local spacing = 50
+    
+    -- Função para criar botões
+    local function createToggleButton(name, displayName, improvement)
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0.9, 0, 0, buttonHeight)
+        button.Position = UDim2.new(0.05, 0, 0, yPos)
+        button.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.7, 0) or Color3.new(0.7, 0, 0)
+        button.BorderSizePixel = 0
+        button.Text = displayName .. ": " .. (improvements[improvement] and "ON" or "OFF")
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.TextScaled = true
+        button.Font = Enum.Font.SourceSans
+        button.Parent = frame
+        
+        button.MouseButton1Click:Connect(function()
+            improvements[improvement] = not improvements[improvement]
+            button.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.7, 0) or Color3.new(0.7, 0, 0)
+            button.Text = displayName .. ": " .. (improvements[improvement] and "ON" or "OFF")
+            print("[MELHORIA] " .. displayName .. " " .. (improvements[improvement] and "ATIVADA" or "DESATIVADA"))
+        end)
+        
+        yPos = yPos + spacing
+    end
+    
+    -- Criar botões
+    createToggleButton("nocooldown", "Sem Cooldown", "noCooldown")
+    createToggleButton("hitbox", "Hitbox Expandida", "expandedHitbox")
+    createToggleButton("attack", "Ataque Otimizado", "optimizedAttack")
+    createToggleButton("stamina", "Stamina Infinita", "autoStamina")
+    createToggleButton("speed", "Movimento Rápido", "fastMovement")
+    
+    -- Botão para fechar/abrir
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 100, 0, 30)
+    toggleButton.Position = UDim2.new(0, 10, 0, 10)
+    toggleButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    toggleButton.BorderSizePixel = 0
+    toggleButton.Text = "OCULTAR"
+    toggleButton.TextColor3 = Color3.new(1, 1, 1)
+    toggleButton.TextScaled = true
+    toggleButton.Font = Enum.Font.SourceSans
+    toggleButton.Parent = gui
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        frame.Visible = not frame.Visible
+        toggleButton.Text = frame.Visible and "OCULTAR" or "MOSTRAR"
+    end)
+end
+
+-- Comando via chat
+local function handleChatCommand(message)
+    local args = string.split(string.lower(message), " ")
+    
+    if args[1] == "!melhoria" and args[2] then
+        local command = args[2]
+        
+        if command == "nocooldown" then
+            improvements.noCooldown = not improvements.noCooldown
+            print("[COMANDO] Sem cooldown: " .. (improvements.noCooldown and "ATIVADO" or "DESATIVADO"))
+        elseif command == "hitboxexpandida" then
+            improvements.expandedHitbox = not improvements.expandedHitbox
+            print("[COMANDO] Hitbox expandida: " .. (improvements.expandedHitbox and "ATIVADA" or "DESATIVADA"))
+        elseif command == "ataqueotimizado" then
+            improvements.optimizedAttack = not improvements.optimizedAttack
+            print("[COMANDO] Ataque otimizado: " .. (improvements.optimizedAttack and "ATIVADO" or "DESATIVADO"))
+        elseif command == "staminainfinita" then
+            improvements.autoStamina = not improvements.autoStamina
+            print("[COMANDO] Stamina infinita: " .. (improvements.autoStamina and "ATIVADA" or "DESATIVADA"))
+        elseif command == "velocidade" then
+            improvements.fastMovement = not improvements.fastMovement
+            print("[COMANDO] Movimento rápido: " .. (improvements.fastMovement and "ATIVADO" or "DESATIVADO"))
+        elseif command == "help" or command == "ajuda" then
+            print("=== COMANDOS DISPONÍVEIS ===")
+            print("!melhoria nocooldown - Remove cooldown dos ataques")
+            print("!melhoria hitboxexpandida - Expande a hitbox dos ataques")
+            print("!melhoria ataqueotimizado - Otimiza os ataques")
+            print("!melhoria staminainfinita - Stamina infinita")
+            print("!melhoria velocidade - Movimento mais rápido")
+        end
     end
 end
 
-print("🔍 EXPLORING COMBAT SYSTEM...")
-
--- Função para mapear recursivamente
-local function exploreFolder(folder, indent, maxDepth)
-    indent = indent or ""
-    maxDepth = maxDepth or 3
+-- Sistema de combate melhorado
+local function setupEnhancedCombat()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local rootPart = character:WaitForChild("HumanoidRootPart")
     
-    if maxDepth <= 0 then return end
-    
-    local results = {}
-    
-    for _, child in pairs(folder:GetChildren()) do
-        local info = indent .. "├─ " .. child.Name .. " (" .. child.ClassName .. ")"
+    -- Criar estados de combate se não existirem
+    local combatState = humanoid:FindFirstChild("CombatState")
+    if not combatState then
+        combatState = Instance.new("Folder")
+        combatState.Name = "CombatState"
+        combatState.Parent = humanoid
         
-        if child:IsA("NumberValue") or child:IsA("BoolValue") or child:IsA("IntValue") then
-            info = info .. " = " .. tostring(child.Value)
-        elseif child:IsA("StringValue") then
-            info = info .. " = '" .. child.Value .. "'"
-        end
+        -- Criar valores necessários
+        local values = {
+            {"Running", "BoolValue", false},
+            {"Stamina", "NumberValue", 100},
+            {"Blocking", "BoolValue", false},
+            {"BlockHealth", "NumberValue", 100},
+            {"Attacking", "BoolValue", false},
+            {"AttackCooldown", "BoolValue", false},
+            {"LastAttacked", "NumberValue", 0},
+            {"Combo", "IntValue", 1},
+            {"Stunned", "BoolValue", false}
+        }
         
-        table.insert(results, info)
-        
-        if #child:GetChildren() > 0 and maxDepth > 1 then
-            local subResults = exploreFolder(child, indent .. "│  ", maxDepth - 1)
-            for _, subResult in pairs(subResults) do
-                table.insert(results, subResult)
-            end
+        for _, valueData in pairs(values) do
+            local value = Instance.new(valueData[2])
+            value.Name = valueData[1]
+            value.Value = valueData[3]
+            value.Parent = combatState
         end
     end
     
-    return results
-end
-
--- Criar GUI Explorer
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CombatSystemExplorer"
-screenGui.Parent = playerGui
-
-local frame = Instance.new("Frame")
-frame.Parent = screenGui
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-frame.BorderSizePixel = 0
-frame.Position = UDim2.new(0.05, 0, 0.05, 0)
-frame.Size = UDim2.new(0.9, 0, 0.9, 0)
-frame.Active = true
-frame.Draggable = true
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = frame
-
--- Header
-local header = Instance.new("Frame")
-header.Parent = frame
-header.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
-header.BorderSizePixel = 0
-header.Size = UDim2.new(1, 0, 0, 40)
-
-local headerCorner = Instance.new("UICorner")
-headerCorner.CornerRadius = UDim.new(0, 8)
-headerCorner.Parent = header
-
-local headerFix = Instance.new("Frame")
-headerFix.Parent = header
-headerFix.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
-headerFix.BorderSizePixel = 0
-headerFix.Position = UDim2.new(0, 0, 0.5, 0)
-headerFix.Size = UDim2.new(1, 0, 0.5, 0)
-
-local title = Instance.new("TextLabel")
-title.Parent = header
-title.BackgroundTransparency = 1
-title.Position = UDim2.new(0, 10, 0, 0)
-title.Size = UDim2.new(1, -50, 1, 0)
-title.Font = Enum.Font.GothamBold
-title.Text = "🔍 COMBAT SYSTEM EXPLORER"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 16
-title.TextXAlignment = Enum.TextXAlignment.Left
-
-local refreshBtn = Instance.new("TextButton")
-refreshBtn.Parent = header
-refreshBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
-refreshBtn.BorderSizePixel = 0
-refreshBtn.Position = UDim2.new(1, -80, 0.5, -12)
-refreshBtn.Size = UDim2.new(0, 35, 0, 24)
-refreshBtn.Font = Enum.Font.GothamBold
-refreshBtn.Text = "🔄"
-refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-refreshBtn.TextSize = 14
-
-local refreshCorner = Instance.new("UICorner")
-refreshCorner.CornerRadius = UDim.new(0, 4)
-refreshCorner.Parent = refreshBtn
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Parent = header
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-closeBtn.BorderSizePixel = 0
-closeBtn.Position = UDim2.new(1, -40, 0.5, -12)
-closeBtn.Size = UDim2.new(0, 30, 0, 24)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.Text = "×"
-closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeBtn.TextSize = 14
-
-local closeBtnCorner = Instance.new("UICorner")
-closeBtnCorner.CornerRadius = UDim.new(0, 4)
-closeBtnCorner.Parent = closeBtn
-
--- Scroll frame
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Parent = frame
-scrollFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-scrollFrame.BorderSizePixel = 0
-scrollFrame.Position = UDim2.new(0, 5, 0, 45)
-scrollFrame.Size = UDim2.new(1, -10, 1, -50)
-scrollFrame.ScrollBarThickness = 8
-scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-
-local scrollCorner = Instance.new("UICorner")
-scrollCorner.CornerRadius = UDim.new(0, 6)
-scrollCorner.Parent = scrollFrame
-
-local textLabel = Instance.new("TextLabel")
-textLabel.Parent = scrollFrame
-textLabel.BackgroundTransparency = 1
-textLabel.Position = UDim2.new(0, 10, 0, 10)
-textLabel.Size = UDim2.new(1, -20, 0, 5000)
-textLabel.Font = Enum.Font.Code
-textLabel.Text = "Scanning..."
-textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-textLabel.TextSize = 12
-textLabel.TextYAlignment = Enum.TextYAlignment.Top
-textLabel.TextXAlignment = Enum.TextXAlignment.Left
-textLabel.TextWrapped = true
-
--- Função para escanear o sistema
-local function scanSystem()
-    local results = {}
-    
-    table.insert(results, "🔍 COMBAT SYSTEM SCAN RESULTS")
-    table.insert(results, "=" .. string.rep("=", 50))
-    table.insert(results, "")
-    
-    -- 1. ReplicatedStorage
-    table.insert(results, "📁 REPLICATEDSTORAGE:")
-    if ReplicatedStorage then
-        local rsResults = exploreFolder(ReplicatedStorage, "", 2)
-        for _, result in pairs(rsResults) do
-            table.insert(results, result)
-        end
-    else
-        table.insert(results, "❌ ReplicatedStorage not found!")
-    end
-    
-    table.insert(results, "")
-    
-    -- 2. Character
-    table.insert(results, "👤 PLAYER CHARACTER:")
-    if player.Character then
-        table.insert(results, "✅ Character found: " .. player.Character.Name)
+    -- Loop principal das melhorias
+    RunService.Heartbeat:Connect(function()
+        if not character or not character.Parent then return end
         
-        local humanoid = player.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            table.insert(results, "✅ Humanoid found")
-            
-            local charResults = exploreFolder(humanoid, "", 2)
-            for _, result in pairs(charResults) do
-                table.insert(results, result)
-            end
+        -- Stamina infinita
+        if improvements.autoStamina and combatState:FindFirstChild("Stamina") then
+            combatState.Stamina.Value = 100
+        end
+        
+        -- Movimento rápido
+        if improvements.fastMovement then
+            humanoid.WalkSpeed = 32
+            humanoid.JumpPower = 75
         else
-            table.insert(results, "❌ Humanoid not found")
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
         end
-    else
-        table.insert(results, "❌ Character not spawned")
-    end
+        
+        -- Remover cooldown
+        if improvements.noCooldown and combatState:FindFirstChild("AttackCooldown") then
+            combatState.AttackCooldown.Value = false
+        end
+        
+        -- Resetar combo mais rápido para ataques otimizados
+        if improvements.optimizedAttack and combatState:FindFirstChild("LastAttacked") then
+            if tick() - combatState.LastAttacked.Value >= 1 then -- Reduz tempo de combo
+                combatState.Combo.Value = 1
+            end
+        end
+    end)
     
-    table.insert(results, "")
-    table.insert(results, "🔧 ANALYSIS COMPLETE!")
-    table.insert(results, "Copy this information to help debug the script.")
-    
-    return table.concat(results, "\n")
-end
-
--- Função para atualizar display
-local function updateDisplay()
-    textLabel.Text = scanSystem()
-    
-    -- Auto-resize
-    local textBounds = textLabel.TextBounds
-    textLabel.Size = UDim2.new(1, -20, 0, math.max(textBounds.Y + 20, scrollFrame.AbsoluteSize.Y))
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textBounds.Y + 40)
-end
-
--- Event handlers
-refreshBtn.MouseButton1Click:Connect(updateDisplay)
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
--- Hotkey
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.F5 then
-        updateDisplay()
-    elseif input.KeyCode == Enum.KeyCode.F6 then
-        screenGui.Enabled = not screenGui.Enabled
-    end
-end)
-
--- Scan inicial
-spawn(function()
-    wait(1)
-    updateDisplay()
-end)
-
-print("🔍 Combat System Explorer loaded!")
-print("📋 Press F5 to refresh scan")
-print("📋 Press F6 to toggle window")
-print("📋 Use this information to fix the combat enhancer!")
-
--- Função adicional para testar modificações em tempo real
-local function createTestPanel()
-    local testFrame = Instance.new("Frame")
-    testFrame.Parent = frame
-    testFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    testFrame.BorderSizePixel = 0
-    testFrame.Position = UDim2.new(0, 5, 1, -120)
-    testFrame.Size = UDim2.new(1, -10, 0, 110)
-    
-    local testCorner = Instance.new("UICorner")
-    testCorner.CornerRadius = UDim.new(0, 6)
-    testCorner.Parent = testFrame
-    
-    local testTitle = Instance.new("TextLabel")
-    testTitle.Parent = testFrame
-    testTitle.BackgroundTransparency = 1
-    testTitle.Size = UDim2.new(1, 0, 0, 25)
-    testTitle.Font = Enum.Font.GothamBold
-    testTitle.Text = "🧪 LIVE TESTING"
-    testTitle.TextColor3 = Color3.fromRGB(255, 200, 100)
-    testTitle.TextSize = 14
-    
-    -- Test buttons
-    local btnY = 30
-    local testButtons = {
-        {name = "Test Stamina", func = function()
-            pcall(function()
-                if player.Character and player.Character.Humanoid then
-                    local combatState = player.Character.Humanoid:FindFirstChild("CombatState")
-                    if combatState and combatState:FindFirstChild("Stamina") then
-                        combatState.Stamina.Value = 999
-                        print("✅ Stamina set to 999")
-                    else
-                        print("❌ Stamina not found")
+    -- Sistema de ataque melhorado
+    local function enhancedAttack()
+        if not combatState then return end
+        
+        local attackStaminaCost = improvements.optimizedAttack and 5 or 10
+        
+        if combatState.Stunned.Value == false and 
+           combatState.Attacking.Value == false and 
+           (improvements.noCooldown or combatState.AttackCooldown.Value == false) and
+           combatState.Stamina.Value >= attackStaminaCost then
+            
+            combatState.AttackCooldown.Value = true
+            combatState.Attacking.Value = true
+            combatState.Stamina.Value = math.max(0, combatState.Stamina.Value - attackStaminaCost)
+            
+            combatState.Combo.Value = combatState.Combo.Value % 4 + 1
+            combatState.LastAttacked.Value = tick()
+            
+            -- Animação e efeitos
+            task.spawn(function()
+                -- Dash melhorado
+                local direction = rootPart.CFrame.LookVector
+                local dashForce = improvements.optimizedAttack and 20 or 10
+                
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.MaxForce = Vector3.new(4000, 0, 4000)
+                bodyVelocity.Velocity = direction * dashForce
+                bodyVelocity.Parent = rootPart
+                
+                game:GetService("Debris"):AddItem(bodyVelocity, 0.2)
+                
+                -- Detecção de hit melhorada
+                local hitRange = improvements.expandedHitbox and 15 or 8
+                local hitSize = improvements.expandedHitbox and Vector3.new(8, 8, 8) or Vector3.new(4, 4, 4)
+                
+                local rp = RaycastParams.new()
+                rp.FilterType = Enum.RaycastFilterType.Exclude
+                rp.FilterDescendantsInstances = {character}
+                
+                -- Múltiplos raycasts para hitbox expandida
+                local directions = {
+                    rootPart.CFrame.LookVector,
+                    (rootPart.CFrame * CFrame.Angles(0, math.rad(15), 0)).LookVector,
+                    (rootPart.CFrame * CFrame.Angles(0, math.rad(-15), 0)).LookVector
+                }
+                
+                if improvements.expandedHitbox then
+                    table.insert(directions, (rootPart.CFrame * CFrame.Angles(0, math.rad(30), 0)).LookVector)
+                    table.insert(directions, (rootPart.CFrame * CFrame.Angles(0, math.rad(-30), 0)).LookVector)
+                end
+                
+                for _, dir in pairs(directions) do
+                    local hitResult = workspace:Blockcast(rootPart.CFrame, hitSize, dir * hitRange, rp)
+                    
+                    if hitResult then
+                        local hitChar = hitResult.Instance.Parent
+                        local hitHumanoid = hitChar:FindFirstChild("Humanoid")
+                        
+                        if hitHumanoid and hitChar ~= character and hitHumanoid.Health > 0 then
+                            -- Aplicar dano
+                            local damage = improvements.optimizedAttack and 25 or 15
+                            hitHumanoid:TakeDamage(damage)
+                            
+                            -- Knockback melhorado
+                            local knockbackForce = improvements.optimizedAttack and 50 or 30
+                            local hitRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                            
+                            if hitRoot then
+                                local bodyVel = Instance.new("BodyVelocity")
+                                bodyVel.MaxForce = Vector3.new(4000, 0, 4000)
+                                bodyVel.Velocity = dir * knockbackForce
+                                bodyVel.Parent = hitRoot
+                                
+                                game:GetService("Debris"):AddItem(bodyVel, 0.3)
+                            end
+                            
+                            -- Efeito visual
+                            local effect = Instance.new("Explosion")
+                            effect.Parent = workspace
+                            effect.Position = hitResult.Position
+                            effect.BlastRadius = 0
+                            effect.BlastPressure = 0
+                            effect.Visible = false
+                            
+                            break
+                        end
                     end
                 end
-            end)
-        end},
-        
-        {name = "Test Stun", func = function()
-            pcall(function()
-                if player.Character and player.Character.Humanoid then
-                    local combatState = player.Character.Humanoid:FindFirstChild("CombatState")
-                    if combatState and combatState:FindFirstChild("Stunned") then
-                        combatState.Stunned.Value = false
-                        print("✅ Stun removed")
-                    else
-                        print("❌ Stunned not found")
-                    end
+                
+                -- Duração do ataque
+                local attackDuration = improvements.optimizedAttack and 0.3 or 0.5
+                task.wait(attackDuration)
+                
+                combatState.Attacking.Value = false
+                
+                -- Cooldown
+                if not improvements.noCooldown then
+                    local cooldownTime = improvements.optimizedAttack and 0.2 or 0.5
+                    task.wait(cooldownTime)
                 end
+                
+                combatState.AttackCooldown.Value = false
             end)
-        end}
-    }
-    
-    for i, btn in ipairs(testButtons) do
-        local testBtn = Instance.new("TextButton")
-        testBtn.Parent = testFrame
-        testBtn.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-        testBtn.BorderSizePixel = 0
-        testBtn.Position = UDim2.new(0, 10 + (i-1) * 120, 0, btnY)
-        testBtn.Size = UDim2.new(0, 110, 0, 30)
-        testBtn.Font = Enum.Font.Gotham
-        testBtn.Text = btn.name
-        testBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        testBtn.TextSize = 12
-        
-        local testBtnCorner = Instance.new("UICorner")
-        testBtnCorner.CornerRadius = UDim.new(0, 4)
-        testBtnCorner.Parent = testBtn
-        
-        testBtn.MouseButton1Click:Connect(btn.func)
+        end
     end
     
-    -- Status display
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Parent = testFrame
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Position = UDim2.new(0, 10, 0, 70)
-    statusLabel.Size = UDim2.new(1, -20, 0, 30)
-    statusLabel.Font = Enum.Font.Code
-    statusLabel.Text = "Ready for testing..."
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    statusLabel.TextSize = 10
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    -- Input handling
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == Enum.KeyCode.F then
+            enhancedAttack()
+        elseif input.KeyCode == Enum.KeyCode.G then
+            if combatState:FindFirstChild("Blocking") then
+                combatState.Blocking.Value = not combatState.Blocking.Value
+            end
+        end
+    end)
 end
 
-createTestPanel()
+-- Conectar eventos
+player.Chatted:Connect(handleChatCommand)
 
-return {explorer = true}
+player.CharacterAdded:Connect(function()
+    wait(1) -- Aguardar carregamento completo
+    setupEnhancedCombat()
+end)
+
+-- Setup inicial
+if player.Character then
+    setupEnhancedCombat()
+end
+
+-- Criar interface
+createCommandInterface()
+
+print("=== SISTEMA DE COMBATE MELHORADO CARREGADO ===")
+print("Pressione F para atacar, G para bloquear")
+print("Use !melhoria help para ver todos os comandos")
+print("Interface gráfica disponível no canto superior esquerdo")
