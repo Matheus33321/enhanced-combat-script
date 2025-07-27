@@ -1,38 +1,30 @@
--- Enhanced Combat System - UI Super Corrigida
+-- Enhanced Combat System - Versão Ultra Básica
 -- Para executar: loadstring(game:HttpGet("https://raw.githubusercontent.com/Matheus33321/enhanced-combat-script/main/enhanced_combat.lua"))()
 
 local success, result = pcall(function()
     local Players = game:GetService("Players")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
-    local TweenService = game:GetService("TweenService")
     
     local player = Players.LocalPlayer
     
-    -- Força destruir qualquer UI existente
-    local function forceDestroyUI()
-        for _, gui in pairs(player.PlayerGui:GetChildren()) do
-            if gui.Name == "EnhancedCombatUI" then
-                gui:Destroy()
-                print("🗑️ UI antiga destruída:", gui.Name)
-            end
+    -- Limpar qualquer UI existente
+    for _, gui in pairs(player.PlayerGui:GetChildren()) do
+        if gui.Name == "EnhancedCombatUI" then
+            gui:Destroy()
         end
-        task.wait(0.2)
     end
     
     -- Verificar se já está carregado
     if _G.CombatSystemLoaded then
-        warn("Sistema de combate já está carregado!")
-        forceDestroyUI()
         _G.CombatSystemLoaded = false
-        task.wait(1)
+        task.wait(0.5)
     end
     _G.CombatSystemLoaded = true
     
-    print("🔥 FORÇANDO CARREGAMENTO DO SISTEMA...")
+    print("🔥 CARREGANDO SISTEMA ULTRA BÁSICO...")
     
-    -- Aguardar configurações do jogo
+    -- Aguardar configurações
     local config = ReplicatedStorage:WaitForChild("CombatConfiguration", 10)
     if not config then
         warn("❌ CombatConfiguration não encontrada!")
@@ -44,279 +36,238 @@ local success, result = pcall(function()
     local improvements = {
         noCooldown = false,
         expandedHitbox = false,
-        optimizedAttack = false,
         autoStamina = false,
-        fastMovement = false,
         removeStun = false
     }
     
-    -- Valores originais para restauração
+    -- Valores originais
     local originalValues = {}
     
-    -- Função para salvar valores originais
+    -- Salvar valores originais
     local function saveOriginalValues()
-        pcall(function()
-            if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
-                originalValues.cooldowns = {}
-                for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
-                    if cooldown:IsA("NumberValue") then
-                        originalValues.cooldowns[cooldown.Name] = cooldown.Value
-                    end
+        if config.Attacking and config.Attacking.Cooldowns then
+            originalValues.cooldowns = {}
+            for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
+                if cooldown:IsA("NumberValue") then
+                    originalValues.cooldowns[cooldown.Name] = cooldown.Value
                 end
-                print("💾 Cooldowns salvos:", #config.Attacking.Cooldowns:GetChildren())
             end
-            
-            if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Ranges") then
-                originalValues.ranges = {}
-                for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
-                    if range:IsA("NumberValue") then
-                        originalValues.ranges[range.Name] = range.Value
-                    end
+        end
+        
+        if config.Attacking and config.Attacking.Ranges then
+            originalValues.ranges = {}
+            for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
+                if range:IsA("NumberValue") then
+                    originalValues.ranges[range.Name] = range.Value
                 end
-                print("💾 Ranges salvos:", #config.Attacking.Ranges:GetChildren())
             end
-        end)
+        end
+        print("💾 Valores salvos")
     end
     
-    -- Aplicar melhorias (simplificado para debug)
+    -- Aplicar melhorias
     local function applyImprovements()
         task.spawn(function()
             while _G.CombatSystemLoaded do
-                pcall(function()
-                    if improvements.noCooldown and config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
-                        for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
-                            if cooldown:IsA("NumberValue") then
-                                cooldown.Value = 0
-                            end
+                -- Sem Cooldown
+                if improvements.noCooldown and config.Attacking and config.Attacking.Cooldowns then
+                    for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
+                        if cooldown:IsA("NumberValue") then
+                            cooldown.Value = 0
                         end
                     end
-                    
-                    if improvements.expandedHitbox and config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Ranges") then
-                        for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
-                            if range:IsA("NumberValue") then
-                                range.Value = originalValues.ranges and originalValues.ranges[range.Name] and originalValues.ranges[range.Name] * 2.5 or 20
-                            end
+                end
+                
+                -- Hitbox Expandida
+                if improvements.expandedHitbox and config.Attacking and config.Attacking.Ranges then
+                    for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
+                        if range:IsA("NumberValue") and originalValues.ranges then
+                            range.Value = originalValues.ranges[range.Name] * 3 or 25
                         end
                     end
-                end)
-                task.wait(0.1)
+                end
+                
+                -- Stamina Infinita
+                if improvements.autoStamina and config.Stamina then
+                    if config.Stamina.AttackStaminaCost then
+                        config.Stamina.AttackStaminaCost.Value = 0
+                    end
+                    if config.Stamina.StaminaDecreaseRate then
+                        config.Stamina.StaminaDecreaseRate.Value = 0
+                    end
+                end
+                
+                -- Sem Stun
+                if improvements.removeStun and config.Stunned and config.Stunned.StunDurations then
+                    for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
+                        if stun:IsA("NumberValue") then
+                            stun.Value = 0
+                        end
+                    end
+                end
+                
+                task.wait(0.2)
             end
         end)
     end
     
-    -- Interface SUPER SIMPLIFICADA para garantir que funcione
-    local function createSimpleUI()
-        print("🎨 CRIANDO UI SIMPLES...")
+    -- Interface MINIMALISTA (sem erros)
+    local function createBasicUI()
+        print("🎨 Criando UI básica...")
         
-        -- Aguardar PlayerGui
-        local playerGui = player:WaitForChild("PlayerGui")
-        print("✅ PlayerGui encontrado")
-        
-        -- Destruir antiga
-        forceDestroyUI()
-        
-        -- Criar ScreenGui básico
+        -- ScreenGui simples
         local screenGui = Instance.new("ScreenGui")
         screenGui.Name = "EnhancedCombatUI"
         screenGui.ResetOnSpawn = false
-        screenGui.Enabled = true
         
-        print("📱 ScreenGui criado")
-        
-        -- Frame principal GRANDE e VISÍVEL
+        -- Frame principal sem elementos complicados
         local mainFrame = Instance.new("Frame")
-        mainFrame.Name = "MainFrame"
-        mainFrame.Size = UDim2.new(0, 400, 0, 500)
-        mainFrame.Position = UDim2.new(0.5, -200, 0.5, -250) -- CENTRO DA TELA
-        mainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        mainFrame.BorderSizePixel = 2
-        mainFrame.BorderColor3 = Color3.fromRGB(0, 255, 0)
+        mainFrame.Size = UDim2.new(0, 350, 0, 400)
+        mainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+        mainFrame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+        mainFrame.BorderSizePixel = 3
+        mainFrame.BorderColor3 = Color3.new(0, 1, 0)
         mainFrame.Active = true
         mainFrame.Draggable = true
-        mainFrame.Visible = true
+        mainFrame.Parent = screenGui
         
-        print("🖼️ MainFrame criado")
-        
-        -- Título GRANDE
+        -- Título simples
         local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, 0, 0, 50)
+        title.Size = UDim2.new(1, 0, 0, 40)
         title.Position = UDim2.new(0, 0, 0, 0)
-        title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        title.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
         title.BorderSizePixel = 0
-        title.Text = "⚔️ ENHANCED COMBAT SYSTEM ⚔️"
-        title.TextColor3 = Color3.fromRGB(0, 255, 0)
-        title.TextSize = 20
+        title.Text = "ENHANCED COMBAT SYSTEM"
+        title.TextColor3 = Color3.new(0, 1, 0)
+        title.TextScaled = true
         title.Font = Enum.Font.SourceSansBold
         title.Parent = mainFrame
         
-        print("📝 Título criado")
-        
-        -- Função para criar botão SIMPLES
-        local function createButton(name, text, yPos, improvement)
+        -- Função para criar botão básico
+        local function createBasicButton(text, yPos, improvement)
             local button = Instance.new("TextButton")
-            button.Name = name
-            button.Size = UDim2.new(0, 350, 0, 40)
+            button.Size = UDim2.new(0, 300, 0, 35)
             button.Position = UDim2.new(0, 25, 0, yPos)
-            button.BackgroundColor3 = improvements[improvement] and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
-            button.BorderSizePixel = 2
-            button.BorderColor3 = Color3.fromRGB(255, 255, 255)
-            button.Text = text .. " - " .. (improvements[improvement] and "ATIVADO" or "DESATIVADO")
-            button.TextColor3 = Color3.fromRGB(255, 255, 255)
-            button.TextSize = 16
+            button.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.8, 0) or Color3.new(0.8, 0, 0)
+            button.BorderSizePixel = 1
+            button.BorderColor3 = Color3.new(1, 1, 1)
+            button.Text = text .. " - " .. (improvements[improvement] and "ON" or "OFF")
+            button.TextColor3 = Color3.new(1, 1, 1)
+            button.TextScaled = true
             button.Font = Enum.Font.SourceSansBold
             button.Parent = mainFrame
             
             button.MouseButton1Click:Connect(function()
                 improvements[improvement] = not improvements[improvement]
-                button.BackgroundColor3 = improvements[improvement] and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
-                button.Text = text .. " - " .. (improvements[improvement] and "ATIVADO" or "DESATIVADO")
+                button.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.8, 0) or Color3.new(0.8, 0, 0)
+                button.Text = text .. " - " .. (improvements[improvement] and "ON" or "OFF")
                 print("🔧 " .. text .. ": " .. (improvements[improvement] and "ATIVADO" or "DESATIVADO"))
             end)
             
-            print("🔘 Botão criado:", name)
             return button
         end
         
-        -- Criar TODOS os botões
-        createButton("NoCooldownBtn", "🚀 SEM COOLDOWN", 70, "noCooldown")
-        createButton("HitboxBtn", "🎯 HITBOX EXPANDIDA", 120, "expandedHitbox")
-        createButton("AttackBtn", "⚡ ATAQUE OTIMIZADO", 170, "optimizedAttack")
-        createButton("StaminaBtn", "♾️ STAMINA INFINITA", 220, "autoStamina")
-        createButton("SpeedBtn", "💨 MOVIMENTO RÁPIDO", 270, "fastMovement")
-        createButton("StunBtn", "🛡️ SEM STUN", 320, "removeStun")
+        -- Criar botões básicos
+        createBasicButton("SEM COOLDOWN", 60, "noCooldown")
+        createBasicButton("HITBOX 3X MAIOR", 110, "expandedHitbox")
+        createBasicButton("STAMINA INFINITA", 160, "autoStamina")
+        createBasicButton("SEM STUN", 210, "removeStun")
         
         -- Botão de teste
-        local testButton = Instance.new("TextButton")
-        testButton.Size = UDim2.new(0, 350, 0, 40)
-        testButton.Position = UDim2.new(0, 25, 0, 380)
-        testButton.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-        testButton.BorderSizePixel = 2
-        testButton.BorderColor3 = Color3.fromRGB(255, 255, 0)
-        testButton.Text = "🧪 TESTE - CLIQUE AQUI"
-        testButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        testButton.TextSize = 16
-        testButton.Font = Enum.Font.SourceSansBold
-        testButton.Parent = mainFrame
+        local testBtn = Instance.new("TextButton")
+        testBtn.Size = UDim2.new(0, 300, 0, 35)
+        testBtn.Position = UDim2.new(0, 25, 0, 270)
+        testBtn.BackgroundColor3 = Color3.new(0, 0, 1)
+        testBtn.BorderSizePixel = 1
+        testBtn.BorderColor3 = Color3.new(1, 1, 0)
+        testBtn.Text = "CLIQUE PARA TESTAR UI"
+        testBtn.TextColor3 = Color3.new(1, 1, 1)
+        testBtn.TextScaled = true
+        testBtn.Font = Enum.Font.SourceSansBold
+        testBtn.Parent = mainFrame
         
-        testButton.MouseButton1Click:Connect(function()
-            print("🧪 BOTÃO DE TESTE CLICADO! UI ESTÁ FUNCIONANDO!")
-            testButton.Text = "✅ FUNCIONANDO!"
-            testButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        testBtn.MouseButton1Click:Connect(function()
+            testBtn.Text = "UI FUNCIONANDO!"
+            testBtn.BackgroundColor3 = Color3.new(0, 1, 0)
+            print("✅ UI TESTE PASSOU!")
         end)
         
-        -- Status
-        local status = Instance.new("TextLabel")
-        status.Size = UDim2.new(1, 0, 0, 30)
-        status.Position = UDim2.new(0, 0, 1, -30)
-        status.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        status.BorderSizePixel = 0
-        status.Text = "🟢 Sistema Ativo - Clique nos botões para ativar melhorias"
-        status.TextColor3 = Color3.fromRGB(0, 255, 0)
-        status.TextSize = 14
-        status.Font = Enum.Font.SourceSans
-        status.Parent = mainFrame
+        -- Botão para ativar tudo
+        local allBtn = Instance.new("TextButton")
+        allBtn.Size = UDim2.new(0, 300, 0, 35)
+        allBtn.Position = UDim2.new(0, 25, 0, 320)
+        allBtn.BackgroundColor3 = Color3.new(1, 0.5, 0)
+        allBtn.BorderSizePixel = 1
+        allBtn.BorderColor3 = Color3.new(1, 1, 1)
+        allBtn.Text = "ATIVAR TODAS AS MELHORIAS"
+        allBtn.TextColor3 = Color3.new(1, 1, 1)
+        allBtn.TextScaled = true
+        allBtn.Font = Enum.Font.SourceSansBold
+        allBtn.Parent = mainFrame
         
-        print("📊 Status criado")
+        allBtn.MouseButton1Click:Connect(function()
+            local allActive = improvements.noCooldown and improvements.expandedHitbox and improvements.autoStamina and improvements.removeStun
+            
+            for key, _ in pairs(improvements) do
+                improvements[key] = not allActive
+            end
+            
+            -- Atualizar todos os botões
+            for _, child in pairs(mainFrame:GetChildren()) do
+                if child:IsA("TextButton") and child ~= testBtn and child ~= allBtn then
+                    local improvement = child.Name:match("noCooldown") and "noCooldown" or
+                                      child.Name:match("expandedHitbox") and "expandedHitbox" or
+                                      child.Name:match("autoStamina") and "autoStamina" or
+                                      child.Name:match("removeStun") and "removeStun"
+                    
+                    if improvement then
+                        child.BackgroundColor3 = improvements[improvement] and Color3.new(0, 0.8, 0) or Color3.new(0.8, 0, 0)
+                    end
+                end
+            end
+            
+            allBtn.Text = (not allActive) and "DESATIVAR TODAS" or "ATIVAR TODAS AS MELHORIAS"
+            print("🔧 TODAS AS MELHORIAS: " .. ((not allActive) and "ATIVADAS" or "DESATIVADAS"))
+        end)
         
-        -- PARENTAR POR ÚLTIMO
-        screenGui.Parent = playerGui
-        print("🎯 ScreenGui adicionado ao PlayerGui")
+        -- Adicionar ao PlayerGui
+        screenGui.Parent = player.PlayerGui
         
-        -- Verificar se foi criado
         task.wait(0.1)
-        local check = playerGui:FindFirstChild("EnhancedCombatUI")
-        if check then
-            print("✅ UI CONFIRMADA NO PLAYERGUI!")
-            print("📍 Posição:", mainFrame.AbsolutePosition)
-            print("📏 Tamanho:", mainFrame.AbsoluteSize)
-            print("👁️ Visível:", mainFrame.Visible)
-        else
-            warn("❌ UI NÃO ENCONTRADA NO PLAYERGUI!")
-        end
-        
+        print("✅ UI criada no centro da tela!")
         return screenGui
     end
     
-    -- Comandos de chat
-    local function handleChatCommand(message)
-        local args = string.split(string.lower(message), " ")
-        
-        if args[1] == "!combat" then
-            if args[2] == "ui" or args[2] == "interface" then
-                createSimpleUI()
-                print("🎨 Interface recriada por comando!")
-            elseif args[2] == "test" or args[2] == "teste" then
-                print("🧪 === TESTE DO SISTEMA ===")
-                print("PlayerGui existe:", player.PlayerGui ~= nil)
-                print("UI existe:", player.PlayerGui:FindFirstChild("EnhancedCombatUI") ~= nil)
-                local ui = player.PlayerGui:FindFirstChild("EnhancedCombatUI")
-                if ui then
-                    print("UI Enabled:", ui.Enabled)
-                    print("MainFrame existe:", ui:FindFirstChild("MainFrame") ~= nil)
-                    if ui:FindFirstChild("MainFrame") then
-                        print("MainFrame Visible:", ui.MainFrame.Visible)
-                    end
-                end
-            elseif args[2] == "help" then
-                print("=== 🎮 COMANDOS ===")
-                print("!combat ui - Recriar interface")
-                print("!combat test - Testar sistema")  
-                print("!combat nocooldown - Toggle sem cooldown")
-                print("!combat hitbox - Toggle hitbox expandida")
-            elseif args[2] == "nocooldown" then
-                improvements.noCooldown = not improvements.noCooldown
-                print("🚀 Sem Cooldown:", improvements.noCooldown and "ATIVADO" or "DESATIVADO")
-            elseif args[2] == "hitbox" then
-                improvements.expandedHitbox = not improvements.expandedHitbox
-                print("🎯 Hitbox Expandida:", improvements.expandedHitbox and "ATIVADA" or "DESATIVADA")
+    -- Comandos de chat simples
+    player.Chatted:Connect(function(message)
+        local msg = string.lower(message)
+        if msg == "!ui" or msg == "!combat" then
+            createBasicUI()
+            print("🎨 UI recriada!")
+        elseif msg == "!test" then
+            print("=== TESTE ===")
+            print("UI existe:", player.PlayerGui:FindFirstChild("EnhancedCombatUI") ~= nil)
+            for key, value in pairs(improvements) do
+                print(key .. ":", value and "ATIVO" or "INATIVO")
             end
         end
-    end
+    end)
     
-    -- Inicialização FORÇADA
-    local function initialize()
-        print("🚀 === INICIALIZANDO SISTEMA FORÇADO ===")
-        
-        -- Aguardar um pouco
-        task.wait(2)
-        
-        -- Salvar valores
-        saveOriginalValues()
-        
-        -- FORÇAR criação da UI múltiplas vezes se necessário
-        for i = 1, 3 do
-            print("🎨 Tentativa", i, "de criar UI...")
-            local ui = createSimpleUI()
-            
-            task.wait(1)
-            
-            local check = player.PlayerGui:FindFirstChild("EnhancedCombatUI")
-            if check then
-                print("✅ UI CRIADA COM SUCESSO NA TENTATIVA", i)
-                break
-            else
-                print("❌ Tentativa", i, "falhou, tentando novamente...")
-            end
-        end
-        
-        -- Aplicar melhorias
-        applyImprovements()
-        
-        -- Conectar chat
-        player.Chatted:Connect(handleChatCommand)
-        
-        print("⚔️ === SISTEMA CARREGADO ===")
-        print("💬 Digite !combat ui se a interface não aparecer")
-        print("💬 Digite !combat test para testar")
-        print("🎯 A interface deve estar NO CENTRO DA TELA!")
-    end
+    -- Inicializar
+    task.wait(1)
+    saveOriginalValues()
+    createBasicUI()
+    applyImprovements()
     
-    initialize()
+    print("⚔️ SISTEMA CARREGADO!")
+    print("💬 Digite !ui para recriar interface")
+    print("💬 Digite !test para verificar status")
+    
     return true
 end)
 
 if not success then
-    warn("❌ ERRO CRÍTICO:", tostring(result))
+    warn("❌ ERRO:", tostring(result))
 else
-    print("✅ SISTEMA CARREGADO COM SUCESSO!")
+    print("✅ SUCESSO TOTAL!")
 end
