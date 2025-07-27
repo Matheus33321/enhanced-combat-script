@@ -45,68 +45,143 @@ local success, result = pcall(function()
     
     -- Salvar valores originais
     local function saveOriginalValues()
-        if config.Attacking and config.Attacking.Cooldowns then
-            originalValues.cooldowns = {}
-            for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
-                if cooldown:IsA("NumberValue") then
-                    originalValues.cooldowns[cooldown.Name] = cooldown.Value
+        pcall(function()
+            if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
+                originalValues.cooldowns = {}
+                for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
+                    if cooldown:IsA("NumberValue") then
+                        originalValues.cooldowns[cooldown.Name] = cooldown.Value
+                        print("💾 Salvou cooldown:", cooldown.Name, "=", cooldown.Value)
+                    end
                 end
             end
-        end
-        
-        if config.Attacking and config.Attacking.Ranges then
-            originalValues.ranges = {}
-            for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
-                if range:IsA("NumberValue") then
-                    originalValues.ranges[range.Name] = range.Value
+            
+            if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Ranges") then
+                originalValues.ranges = {}
+                for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
+                    if range:IsA("NumberValue") then
+                        originalValues.ranges[range.Name] = range.Value
+                        print("💾 Salvou range:", range.Name, "=", range.Value)
+                    end
                 end
             end
-        end
-        print("💾 Valores salvos")
+            
+            if config:FindFirstChild("Stamina") then
+                if config.Stamina:FindFirstChild("AttackStaminaCost") then
+                    originalValues.staminaCost = config.Stamina.AttackStaminaCost.Value
+                    print("💾 Salvou stamina cost:", originalValues.staminaCost)
+                end
+            end
+            
+            if config:FindFirstChild("Stunned") and config.Stunned:FindFirstChild("StunDurations") then
+                originalValues.stunDurations = {}
+                for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
+                    if stun:IsA("NumberValue") then
+                        originalValues.stunDurations[stun.Name] = stun.Value
+                        print("💾 Salvou stun:", stun.Name, "=", stun.Value)
+                    end
+                end
+            end
+        end)
+        print("💾 Valores originais salvos!")
     end
     
     -- Aplicar melhorias
     local function applyImprovements()
         task.spawn(function()
             while _G.CombatSystemLoaded do
-                -- Sem Cooldown
-                if improvements.noCooldown and config.Attacking and config.Attacking.Cooldowns then
-                    for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
-                        if cooldown:IsA("NumberValue") then
-                            cooldown.Value = 0
+                pcall(function()
+                    -- Sem Cooldown
+                    if improvements.noCooldown then
+                        if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Cooldowns") then
+                            for _, cooldown in pairs(config.Attacking.Cooldowns:GetChildren()) do
+                                if cooldown:IsA("NumberValue") then
+                                    cooldown.Value = 0.01 -- Quase zero
+                                    print("🚀 Cooldown zerado:", cooldown.Name)
+                                end
+                            end
+                        end
+                    else
+                        -- Restaurar cooldowns originais
+                        if originalValues.cooldowns then
+                            for name, value in pairs(originalValues.cooldowns) do
+                                local cooldown = config.Attacking.Cooldowns:FindFirstChild(name)
+                                if cooldown and cooldown:IsA("NumberValue") then
+                                    cooldown.Value = value
+                                end
+                            end
                         end
                     end
-                end
-                
-                -- Hitbox Expandida
-                if improvements.expandedHitbox and config.Attacking and config.Attacking.Ranges then
-                    for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
-                        if range:IsA("NumberValue") and originalValues.ranges then
-                            range.Value = originalValues.ranges[range.Name] * 3 or 25
+                    
+                    -- Hitbox Expandida
+                    if improvements.expandedHitbox then
+                        if config:FindFirstChild("Attacking") and config.Attacking:FindFirstChild("Ranges") then
+                            for _, range in pairs(config.Attacking.Ranges:GetChildren()) do
+                                if range:IsA("NumberValue") and originalValues.ranges and originalValues.ranges[range.Name] then
+                                    range.Value = originalValues.ranges[range.Name] * 3
+                                    print("🎯 Range expandido:", range.Name, "para", range.Value)
+                                end
+                            end
+                        end
+                    else
+                        -- Restaurar ranges originais
+                        if originalValues.ranges then
+                            for name, value in pairs(originalValues.ranges) do
+                                local range = config.Attacking.Ranges:FindFirstChild(name)
+                                if range and range:IsA("NumberValue") then
+                                    range.Value = value
+                                end
+                            end
                         end
                     end
-                end
-                
-                -- Stamina Infinita
-                if improvements.autoStamina and config.Stamina then
-                    if config.Stamina.AttackStaminaCost then
-                        config.Stamina.AttackStaminaCost.Value = 0
-                    end
-                    if config.Stamina.StaminaDecreaseRate then
-                        config.Stamina.StaminaDecreaseRate.Value = 0
-                    end
-                end
-                
-                -- Sem Stun
-                if improvements.removeStun and config.Stunned and config.Stunned.StunDurations then
-                    for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
-                        if stun:IsA("NumberValue") then
-                            stun.Value = 0
+                    
+                    -- Stamina Infinita
+                    if improvements.autoStamina then
+                        if config:FindFirstChild("Stamina") then
+                            if config.Stamina:FindFirstChild("AttackStaminaCost") then
+                                config.Stamina.AttackStaminaCost.Value = 0
+                                print("♾️ Stamina cost zerado")
+                            end
+                            if config.Stamina:FindFirstChild("StaminaDecreaseRate") then
+                                config.Stamina.StaminaDecreaseRate.Value = 0
+                                print("♾️ Stamina decrease zerado")
+                            end
+                            if config.Stamina:FindFirstChild("StaminaIncreaseRate") then
+                                config.Stamina.StaminaIncreaseRate.Value = 1000
+                                print("♾️ Stamina regen aumentado")
+                            end
+                        end
+                    else
+                        -- Restaurar stamina original
+                        if originalValues.staminaCost and config.Stamina and config.Stamina:FindFirstChild("AttackStaminaCost") then
+                            config.Stamina.AttackStaminaCost.Value = originalValues.staminaCost
                         end
                     end
-                end
+                    
+                    -- Sem Stun
+                    if improvements.removeStun then
+                        if config:FindFirstChild("Stunned") and config.Stunned:FindFirstChild("StunDurations") then
+                            for _, stun in pairs(config.Stunned.StunDurations:GetChildren()) do
+                                if stun:IsA("NumberValue") then
+                                    stun.Value = 0.01 -- Quase zero
+                                    print("🛡️ Stun removido:", stun.Name)
+                                end
+                            end
+                        end
+                    else
+                        -- Restaurar stuns originais
+                        if originalValues.stunDurations then
+                            for name, value in pairs(originalValues.stunDurations) do
+                                local stun = config.Stunned.StunDurations:FindFirstChild(name)
+                                if stun and stun:IsA("NumberValue") then
+                                    stun.Value = value
+                                end
+                            end
+                        end
+                    end
+                end)
                 
-                task.wait(0.2)
+                task.wait(0.1) -- Verificar mais frequentemente
             end
         end)
     end
@@ -238,20 +313,56 @@ local success, result = pcall(function()
         return screenGui
     end
     
-    -- Comandos de chat simples
-    player.Chatted:Connect(function(message)
-        local msg = string.lower(message)
-        if msg == "!ui" or msg == "!combat" then
-            createBasicUI()
-            print("🎨 UI recriada!")
-        elseif msg == "!test" then
-            print("=== TESTE ===")
-            print("UI existe:", player.PlayerGui:FindFirstChild("EnhancedCombatUI") ~= nil)
-            for key, value in pairs(improvements) do
-                print(key .. ":", value and "ATIVO" or "INATIVO")
+        -- Comandos de chat com debug
+        player.Chatted:Connect(function(message)
+            local msg = string.lower(message)
+            if msg == "!ui" or msg == "!combat" then
+                createBasicUI()
+                print("🎨 UI recriada!")
+            elseif msg == "!test" then
+                print("=== TESTE COMPLETO ===")
+                print("UI existe:", player.PlayerGui:FindFirstChild("EnhancedCombatUI") ~= nil)
+                print("Config existe:", config ~= nil)
+                
+                -- Testar estrutura
+                if config:FindFirstChild("Attacking") then
+                    print("✅ Attacking encontrado")
+                    if config.Attacking:FindFirstChild("Cooldowns") then
+                        print("✅ Cooldowns encontrado, itens:", #config.Attacking.Cooldowns:GetChildren())
+                    end
+                    if config.Attacking:FindFirstChild("Ranges") then
+                        print("✅ Ranges encontrado, itens:", #config.Attacking.Ranges:GetChildren())
+                    end
+                end
+                
+                if config:FindFirstChild("Stamina") then
+                    print("✅ Stamina encontrado")
+                end
+                
+                if config:FindFirstChild("Stunned") then
+                    print("✅ Stunned encontrado")
+                end
+                
+                print("--- STATUS DAS MELHORIAS ---")
+                for key, value in pairs(improvements) do
+                    print(key .. ":", value and "ATIVO" or "INATIVO")
+                end
+            elseif msg == "!debug" then
+                print("=== DEBUG VALORES ===")
+                if originalValues.cooldowns then
+                    for name, value in pairs(originalValues.cooldowns) do
+                        local current = config.Attacking.Cooldowns:FindFirstChild(name)
+                        print("Cooldown", name .. ":", "Original =", value, "Atual =", current and current.Value or "N/A")
+                    end
+                end
+                if originalValues.ranges then
+                    for name, value in pairs(originalValues.ranges) do
+                        local current = config.Attacking.Ranges:FindFirstChild(name)
+                        print("Range", name .. ":", "Original =", value, "Atual =", current and current.Value or "N/A")
+                    end
+                end
             end
-        end
-    end)
+        end)
     
     -- Inicializar
     task.wait(1)
