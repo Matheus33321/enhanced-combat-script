@@ -63,15 +63,15 @@ function Menu:new()
 end
 
 function Menu:show()
-    print("\n" .. "="*50)
+    print("\n" .. string.rep("=", 50))
     print("🎯 ENHANCED HITBOX - MENU DE CONFIGURAÇÃO")
-    print("="*50)
+    print(string.rep("=", 50))
     
     for _, option in ipairs(self.options) do
         print(option)
     end
     
-    print("="*50)
+    print(string.rep("=", 50))
     print("Digite o número da opção desejada:")
 end
 
@@ -303,9 +303,9 @@ function runMenu()
     end
     
     print("\n💾 SCRIPT GERADO:")
-    print("="*60)
+    print(string.rep("=", 60))
     print(generateRobloxScript())
-    print("="*60)
+    print(string.rep("=", 60))
     print("✅ Configuração concluída! Copie o script acima para usar no Roblox.")
 end
 
