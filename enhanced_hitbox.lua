@@ -1,542 +1,449 @@
--- Enhanced Hitbox Script - Versão que REALMENTE modifica a hitbox
--- Execute: loadstring(game:HttpGet("https://raw.githubusercontent.com/Matheus33321/enhanced-combat-script/main/enhanced_hitbox.lua"))()
-
-print("Carregando Enhanced Hitbox com modificação real...")
+-- Sistema de Detecção de Combate Melhorado
+-- Executável via loadstring
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
--- Configurações básicas
-local config = {
-    enabled = false,
-    hitboxSize = 20,
-    showVisual = true,
-    rangeMultiplier = 3,
-    hitboxRadius = 10
+-- Configurações de detecção
+local DetectionConfig = {
+    -- Configurações de área de detecção
+    Width = 8,      -- Largura da área (X)
+    Height = 6,     -- Altura da área (Y) 
+    Depth = 10,     -- Profundidade da área (Z)
+    
+    -- Configurações de alcance
+    MaxRange = 20,  -- Alcance máximo do ataque
+    
+    -- Configurações visuais
+    ShowHitbox = true,
+    HitboxTransparency = 0.7,
+    HitboxColor = Color3.fromRGB(255, 0, 0),
+    
+    -- Configurações de filtro
+    FilterSelf = true,
+    FilterNonHumanoids = true,
+    
+    -- Configurações de cooldown
+    AttackCooldown = 0.5,
 }
 
--- Variáveis
-local screenGui
-local mainFrame
-local hitboxPart
-local connections = {}
+-- Variáveis de controle
+local lastAttackTime = 0
+local isMenuOpen = false
+local hitboxPart = nil
+local menuGui = nil
 
--- Criar GUI básica
-local function createSimpleGUI()
-    -- Limpar GUI anterior
-    if screenGui then
-        screenGui:Destroy()
-    end
-    
-    screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "HitboxGUI"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = player.PlayerGui
-    
-    -- Frame principal
-    mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 280, 0, 350)
-    mainFrame.Position = UDim2.new(0, 10, 0.5, -175)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    mainFrame.BorderColor3 = Color3.fromRGB(255, 0, 0)
-    mainFrame.BorderSizePixel = 2
-    mainFrame.Active = true
-    mainFrame.Draggable = true
-    mainFrame.Parent = screenGui
-    
-    -- Título
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, 0, 0, 30)
-    titleLabel.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    titleLabel.Text = "HITBOX ENHANCER V2"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 14
-    titleLabel.Font = Enum.Font.SourceSansBold
-    titleLabel.Parent = mainFrame
-    
-    -- Botão ON/OFF
-    local toggleButton = Instance.new("TextButton")
-    toggleButton.Size = UDim2.new(0.9, 0, 0, 40)
-    toggleButton.Position = UDim2.new(0.05, 0, 0, 40)
-    toggleButton.BackgroundColor3 = config.enabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
-    toggleButton.Text = config.enabled and "ATIVADO" or "DESATIVADO"
-    toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleButton.TextSize = 16
-    toggleButton.Font = Enum.Font.SourceSansBold
-    toggleButton.Parent = mainFrame
-    
-    -- Label tamanho
-    local sizeLabel = Instance.new("TextLabel")
-    sizeLabel.Size = UDim2.new(0.9, 0, 0, 25)
-    sizeLabel.Position = UDim2.new(0.05, 0, 0, 90)
-    sizeLabel.BackgroundTransparency = 1
-    sizeLabel.Text = "Tamanho da Hitbox: " .. config.hitboxSize
-    sizeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    sizeLabel.TextSize = 14
-    sizeLabel.Font = Enum.Font.SourceSans
-    sizeLabel.Parent = mainFrame
-    
-    -- Botões de tamanho
-    local decreaseBtn = Instance.new("TextButton")
-    decreaseBtn.Size = UDim2.new(0.2, 0, 0, 30)
-    decreaseBtn.Position = UDim2.new(0.05, 0, 0, 115)
-    decreaseBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    decreaseBtn.Text = "-"
-    decreaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    decreaseBtn.TextSize = 20
-    decreaseBtn.Font = Enum.Font.SourceSansBold
-    decreaseBtn.Parent = mainFrame
-    
-    local increaseBtn = Instance.new("TextButton")
-    increaseBtn.Size = UDim2.new(0.2, 0, 0, 30)
-    increaseBtn.Position = UDim2.new(0.75, 0, 0, 115)
-    increaseBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    increaseBtn.Text = "+"
-    increaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    increaseBtn.TextSize = 20
-    increaseBtn.Font = Enum.Font.SourceSansBold
-    increaseBtn.Parent = mainFrame
-    
-    -- Label alcance
-    local rangeLabel = Instance.new("TextLabel")
-    rangeLabel.Size = UDim2.new(0.9, 0, 0, 25)
-    rangeLabel.Position = UDim2.new(0.05, 0, 0, 155)
-    rangeLabel.BackgroundTransparency = 1
-    rangeLabel.Text = "Alcance: " .. config.hitboxRadius
-    rangeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    rangeLabel.TextSize = 14
-    rangeLabel.Font = Enum.Font.SourceSans
-    rangeLabel.Parent = mainFrame
-    
-    -- Botões alcance
-    local rangeDecBtn = Instance.new("TextButton")
-    rangeDecBtn.Size = UDim2.new(0.2, 0, 0, 30)
-    rangeDecBtn.Position = UDim2.new(0.05, 0, 0, 180)
-    rangeDecBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    rangeDecBtn.Text = "-"
-    rangeDecBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    rangeDecBtn.TextSize = 20
-    rangeDecBtn.Font = Enum.Font.SourceSansBold
-    rangeDecBtn.Parent = mainFrame
-    
-    local rangeIncBtn = Instance.new("TextButton")
-    rangeIncBtn.Size = UDim2.new(0.2, 0, 0, 30)
-    rangeIncBtn.Position = UDim2.new(0.75, 0, 0, 180)
-    rangeIncBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    rangeIncBtn.Text = "+"
-    rangeIncBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    rangeIncBtn.TextSize = 20
-    rangeIncBtn.Font = Enum.Font.SourceSansBold
-    rangeIncBtn.Parent = mainFrame
-    
-    -- Label multiplicador
-    local multLabel = Instance.new("TextLabel")
-    multLabel.Size = UDim2.new(0.9, 0, 0, 25)
-    multLabel.Position = UDim2.new(0.05, 0, 0, 220)
-    multLabel.BackgroundTransparency = 1
-    multLabel.Text = "Multiplicador: " .. config.rangeMultiplier
-    multLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    multLabel.TextSize = 14
-    multLabel.Font = Enum.Font.SourceSans
-    multLabel.Parent = mainFrame
-    
-    -- Botões multiplicador
-    local multDecBtn = Instance.new("TextButton")
-    multDecBtn.Size = UDim2.new(0.2, 0, 0, 30)
-    multDecBtn.Position = UDim2.new(0.05, 0, 0, 245)
-    multDecBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    multDecBtn.Text = "-"
-    multDecBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    multDecBtn.TextSize = 20
-    multDecBtn.Font = Enum.Font.SourceSansBold
-    multDecBtn.Parent = mainFrame
-    
-    local multIncBtn = Instance.new("TextButton")
-    multIncBtn.Size = UDim2.new(0.2, 0, 0, 30)
-    multIncBtn.Position = UDim2.new(0.75, 0, 0, 245)
-    multIncBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    multIncBtn.Text = "+"
-    multIncBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    multIncBtn.TextSize = 20
-    multIncBtn.Font = Enum.Font.SourceSansBold
-    multIncBtn.Parent = mainFrame
-    
-    -- Botão visual
-    local visualBtn = Instance.new("TextButton")
-    visualBtn.Size = UDim2.new(0.9, 0, 0, 35)
-    visualBtn.Position = UDim2.new(0.05, 0, 0, 285)
-    visualBtn.BackgroundColor3 = config.showVisual and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
-    visualBtn.Text = config.showVisual and "VISUAL: ON" or "VISUAL: OFF"
-    visualBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    visualBtn.TextSize = 14
-    visualBtn.Font = Enum.Font.SourceSans
-    visualBtn.Parent = mainFrame
-    
-    -- Info
-    local infoLabel = Instance.new("TextLabel")
-    infoLabel.Size = UDim2.new(0.9, 0, 0, 25)
-    infoLabel.Position = UDim2.new(0.05, 0, 0, 325)
-    infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "Pressione H para abrir/fechar"
-    infoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    infoLabel.TextSize = 12
-    infoLabel.Font = Enum.Font.SourceSans
-    infoLabel.Parent = mainFrame
-    
-    -- Eventos dos botões
-    toggleButton.MouseButton1Click:Connect(function()
-        config.enabled = not config.enabled
-        toggleButton.BackgroundColor3 = config.enabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
-        toggleButton.Text = config.enabled and "ATIVADO" or "DESATIVADO"
-        print("Enhanced Hitbox", config.enabled and "ATIVADO" or "DESATIVADO")
-        
-        if config.enabled then
-            hookCombatSystem()
-        else
-            unhookCombatSystem()
-        end
-    end)
-    
-    decreaseBtn.MouseButton1Click:Connect(function()
-        config.hitboxSize = math.max(5, config.hitboxSize - 5)
-        sizeLabel.Text = "Tamanho da Hitbox: " .. config.hitboxSize
-        updateHitboxVisual()
-    end)
-    
-    increaseBtn.MouseButton1Click:Connect(function()
-        config.hitboxSize = math.min(100, config.hitboxSize + 5)
-        sizeLabel.Text = "Tamanho da Hitbox: " .. config.hitboxSize
-        updateHitboxVisual()
-    end)
-    
-    rangeDecBtn.MouseButton1Click:Connect(function()
-        config.hitboxRadius = math.max(5, config.hitboxRadius - 2)
-        rangeLabel.Text = "Alcance: " .. config.hitboxRadius
-    end)
-    
-    rangeIncBtn.MouseButton1Click:Connect(function()
-        config.hitboxRadius = math.min(50, config.hitboxRadius + 2)
-        rangeLabel.Text = "Alcance: " .. config.hitboxRadius
-    end)
-    
-    multDecBtn.MouseButton1Click:Connect(function()
-        config.rangeMultiplier = math.max(1, config.rangeMultiplier - 0.5)
-        multLabel.Text = "Multiplicador: " .. config.rangeMultiplier
-    end)
-    
-    multIncBtn.MouseButton1Click:Connect(function()
-        config.rangeMultiplier = math.min(10, config.rangeMultiplier + 0.5)
-        multLabel.Text = "Multiplicador: " .. config.rangeMultiplier
-    end)
-    
-    visualBtn.MouseButton1Click:Connect(function()
-        config.showVisual = not config.showVisual
-        visualBtn.BackgroundColor3 = config.showVisual and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
-        visualBtn.Text = config.showVisual and "VISUAL: ON" or "VISUAL: OFF"
-        updateHitboxVisual()
-    end)
-end
-
--- Criar hitbox visual
-function updateHitboxVisual()
+-- Função para criar hitbox visual
+local function createHitbox(cframe, size)
     if hitboxPart then
         hitboxPart:Destroy()
-        hitboxPart = nil
     end
     
-    if not config.showVisual or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+    if not DetectionConfig.ShowHitbox then
         return
     end
     
     hitboxPart = Instance.new("Part")
-    hitboxPart.Name = "HitboxVisual"
-    hitboxPart.Size = Vector3.new(config.hitboxSize, config.hitboxSize, config.hitboxSize)
-    hitboxPart.Material = Enum.Material.Neon
-    hitboxPart.BrickColor = BrickColor.new("Really red")
-    hitboxPart.Transparency = 0.7
-    hitboxPart.CanCollide = false
+    hitboxPart.Name = "AttackHitbox"
     hitboxPart.Anchored = true
-    hitboxPart.Shape = Enum.PartType.Ball
+    hitboxPart.CanCollide = false
+    hitboxPart.Material = Enum.Material.ForceField
+    hitboxPart.BrickColor = BrickColor.new("Really red")
+    hitboxPart.Color = DetectionConfig.HitboxColor
+    hitboxPart.Transparency = DetectionConfig.HitboxTransparency
+    hitboxPart.Size = size
+    hitboxPart.CFrame = cframe
     hitboxPart.Parent = workspace
     
-    -- Efeito visual
-    local selectionBox = Instance.new("SelectionBox")
-    selectionBox.Adornee = hitboxPart
-    selectionBox.Color3 = Color3.fromRGB(255, 0, 0)
-    selectionBox.LineThickness = 0.2
-    selectionBox.Parent = hitboxPart
+    -- Remove hitbox após 0.2 segundos
+    game:GetService("Debris"):AddItem(hitboxPart, 0.2)
 end
 
--- Atualizar posição da hitbox
-local function startHitboxUpdate()
-    if connections.hitboxUpdate then
-        connections.hitboxUpdate:Disconnect()
+-- Função para detectar alvos usando Region3
+local function detectTargetsInRegion(character, attackDirection)
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then
+        return {}
     end
     
-    connections.hitboxUpdate = RunService.Heartbeat:Connect(function()
-        if hitboxPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local root = player.Character.HumanoidRootPart
-            hitboxPart.CFrame = root.CFrame * CFrame.new(0, 0, -config.hitboxSize/4)
-        end
-    end)
-end
-
--- Função para encontrar inimigos aprimorada
-local function findNearbyEnemies(attackerChar, range)
-    local attackerRoot = attackerChar.HumanoidRootPart
-    local attackerPos = attackerRoot.Position
-    local enemies = {}
+    -- Calcula posição central da área de detecção
+    local centerPosition = humanoidRootPart.Position + (attackDirection * (DetectionConfig.Depth / 2))
     
-    for _, obj in pairs(workspace:GetChildren()) do
-        if obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and obj ~= attackerChar then
-            local targetRoot = obj.HumanoidRootPart
-            local targetPos = targetRoot.Position
-            local distance = (attackerPos - targetPos).Magnitude
+    -- Calcula o tamanho da região
+    local regionSize = Vector3.new(
+        DetectionConfig.Width,
+        DetectionConfig.Height,
+        DetectionConfig.Depth
+    )
+    
+    -- Cria a região 3D
+    local minPoint = centerPosition - (regionSize / 2)
+    local maxPoint = centerPosition + (regionSize / 2)
+    
+    -- Ajusta pontos para garantir que min < max
+    local adjustedMin = Vector3.new(
+        math.min(minPoint.X, maxPoint.X),
+        math.min(minPoint.Y, maxPoint.Y),
+        math.min(minPoint.Z, maxPoint.Z)
+    )
+    local adjustedMax = Vector3.new(
+        math.max(minPoint.X, maxPoint.X),
+        math.max(minPoint.Y, maxPoint.Y),
+        math.max(minPoint.Z, maxPoint.Z)
+    )
+    
+    local region = Region3.new(adjustedMin, adjustedMax)
+    
+    -- Expande região para garantir precisão
+    region = region:ExpandToGrid(4)
+    
+    -- Cria hitbox visual
+    local hitboxCFrame = CFrame.new(centerPosition, centerPosition + attackDirection)
+    createHitbox(hitboxCFrame, regionSize)
+    
+    -- Obtém partes na região
+    local partsInRegion = workspace:ReadVoxels(region, 4)
+    local foundTargets = {}
+    
+    -- Busca por personagens nas partes encontradas
+    local checkedCharacters = {}
+    
+    for _, part in pairs(workspace:GetPartBoundsInRegion(region, math.huge, math.huge)) do
+        local partCharacter = part.Parent
+        
+        -- Verifica se é um personagem válido
+        if partCharacter:FindFirstChild("Humanoid") and partCharacter:FindFirstChild("HumanoidRootPart") then
             
-            if distance <= range and obj.Humanoid.Health > 0 then
-                -- Verificar se está na direção geral do ataque (muito permissivo)
-                local direction = (targetPos - attackerPos).Unit
-                local attackDirection = attackerRoot.CFrame.LookVector
-                local dotProduct = attackDirection:Dot(direction)
+            -- Evita duplicatas
+            if not checkedCharacters[partCharacter] then
+                checkedCharacters[partCharacter] = true
                 
-                -- Permite hits em um ângulo muito amplo
-                if dotProduct > -0.5 then
-                    table.insert(enemies, {
-                        character = obj,
-                        distance = distance,
-                        position = targetPos
+                -- Filtros
+                local isValid = true
+                
+                -- Filtra o próprio jogador
+                if DetectionConfig.FilterSelf and partCharacter == character then
+                    isValid = false
+                end
+                
+                -- Filtra non-humanoids
+                if DetectionConfig.FilterNonHumanoids and not partCharacter:FindFirstChild("Humanoid") then
+                    isValid = false
+                end
+                
+                -- Verifica se está dentro do alcance máximo
+                local distance = (partCharacter.HumanoidRootPart.Position - humanoidRootPart.Position).Magnitude
+                if distance > DetectionConfig.MaxRange then
+                    isValid = false
+                end
+                
+                -- Verifica se o personagem está vivo
+                if partCharacter.Humanoid.Health <= 0 then
+                    isValid = false
+                end
+                
+                if isValid then
+                    table.insert(foundTargets, {
+                        Character = partCharacter,
+                        Distance = distance,
+                        Part = part
                     })
                 end
             end
         end
     end
     
-    -- Ordenar por distância
-    table.sort(enemies, function(a, b) return a.distance < b.distance end)
-    return enemies
+    -- Ordena por distância (mais próximo primeiro)
+    table.sort(foundTargets, function(a, b)
+        return a.Distance < b.Distance
+    end)
+    
+    return foundTargets
 end
 
--- Variável para armazenar a função original
-local originalDoAttack = nil
-
--- Hook no sistema de combate
-function hookCombatSystem()
-    if not ReplicatedStorage:FindFirstChild("Events") or not ReplicatedStorage.Events:FindFirstChild("DoAttack") then
-        warn("Sistema de combate não encontrado!")
+-- Função para executar ataque
+local function performAttack()
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
         return
     end
     
-    local doAttackEvent = ReplicatedStorage.Events.DoAttack
+    -- Verifica cooldown
+    local currentTime = tick()
+    if currentTime - lastAttackTime < DetectionConfig.AttackCooldown then
+        return
+    end
+    lastAttackTime = currentTime
     
-    -- Substituir a conexão original
-    if originalDoAttack then
-        originalDoAttack:Disconnect()
+    -- Calcula direção do ataque baseada na câmera/mouse
+    local camera = workspace.CurrentCamera
+    local attackDirection = (mouse.Hit.Position - character.HumanoidRootPart.Position).Unit
+    
+    -- Se não conseguir direção do mouse, usa direção da câmera
+    if attackDirection.Magnitude == 0 then
+        attackDirection = camera.CFrame.LookVector
     end
     
-    -- Nossa versão modificada da função doAttack
-    originalDoAttack = doAttackEvent.OnServerEvent:Connect(function(plr)
-        local char = plr.Character
-        local root = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChild("Humanoid")
+    -- Detecta alvos
+    local targets = detectTargetsInRegion(character, attackDirection)
+    
+    -- Processa alvos encontrados
+    if #targets > 0 then
+        print("🎯 Alvos detectados: " .. #targets)
         
-        if not (char and hum and hum.Health > 0 and root) then return end
-        
-        local combatState = hum.CombatState
-        local attackStaminaCost = ReplicatedStorage.CombatConfiguration.Stamina.AttackStaminaCost.Value
-        
-        if not (combatState.Stunned.Value == false and combatState.Attacking.Value == false and 
-                combatState.AttackCooldown.Value == false and combatState.Stamina.Value >= attackStaminaCost) then
-            return
-        end
-        
-        combatState.AttackCooldown.Value = true
-        combatState.Attacking.Value = true
-        combatState.Stamina.Value -= attackStaminaCost
-        
-        combatState.Combo.Value += 1
-        if combatState.Combo.Value > #ReplicatedStorage.CombatConfiguration.Attacking.Animations:GetChildren() or 
-           tick() - combatState.LastAttacked.Value >= ReplicatedStorage.CombatConfiguration.Combo.ExpireTime.Value then
-            combatState.Combo.Value = 1
-        end
-        
-        combatState.LastAttacked.Value = tick()
-        
-        task.spawn(function()
-            local wooshes = ReplicatedStorage.CombatConfiguration.SoundEffects.Wooshes:GetChildren()
-            local wooshSound = wooshes[math.random(1, #wooshes)]:Clone()
-            wooshSound.Parent = root
-            wooshSound:Play()
+        for i, target in ipairs(targets) do
+            local targetCharacter = target.Character
+            local humanoid = targetCharacter:FindFirstChild("Humanoid")
             
-            wooshSound.Ended:Connect(function()
-                wooshSound:Destroy()
-            end)
-            
-            local direction = root.CFrame.LookVector
-            local knockback = ReplicatedStorage.CombatConfiguration.Attacking.Dash[tostring(combatState.Combo.Value)].Value
-            
-            ReplicatedStorage.Events.DealKnockback:FireClient(plr, direction, knockback)
-            
-            local attackAnimations = {}
-            for i = 1, #ReplicatedStorage.CombatConfiguration.Attacking.Animations:GetChildren() do
-                table.insert(attackAnimations, ReplicatedStorage.CombatConfiguration.Attacking.Animations[tostring(i)])
+            if humanoid then
+                -- Aplica dano (exemplo)
+                local damage = 20
+                humanoid:TakeDamage(damage)
+                
+                -- Efeito visual no alvo
+                local effect = Instance.new("Explosion")
+                effect.Position = targetCharacter.HumanoidRootPart.Position
+                effect.BlastRadius = 5
+                effect.BlastPressure = 0
+                effect.Parent = workspace
+                
+                print("💥 Dano aplicado em: " .. targetCharacter.Name .. " (Dano: " .. damage .. ")")
             end
+        end
+    else
+        print("❌ Nenhum alvo encontrado")
+    end
+end
+
+-- Função para criar menu de configuração
+local function createConfigMenu()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CombatConfigMenu"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+    screenGui.ResetOnSpawn = false
+    
+    -- Frame principal
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 350, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -250)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+    
+    -- Adiciona cantos arredondados
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = mainFrame
+    
+    -- Título
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.SourceSansBold
+    title.Text = "⚔️ Configurações de Combate"
+    title.Parent = mainFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = title
+    
+    -- ScrollFrame para configurações
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, -20, 1, -100)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 60)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.ScrollBarThickness = 8
+    scrollFrame.Parent = mainFrame
+    
+    -- Layout
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 10)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scrollFrame
+    
+    local function createSlider(name, configKey, min, max, step)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 0, 80)
+        frame.BackgroundTransparency = 1
+        frame.Parent = scrollFrame
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 0, 25)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextScaled = true
+        label.Font = Enum.Font.SourceSans
+        label.Text = name .. ": " .. DetectionConfig[configKey]
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = frame
+        
+        local sliderFrame = Instance.new("Frame")
+        sliderFrame.Size = UDim2.new(1, 0, 0, 20)
+        sliderFrame.Position = UDim2.new(0, 0, 0, 30)
+        sliderFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        sliderFrame.Parent = frame
+        
+        local sliderCorner = Instance.new("UICorner")
+        sliderCorner.CornerRadius = UDim.new(0, 10)
+        sliderCorner.Parent = sliderFrame
+        
+        local sliderButton = Instance.new("Frame")
+        sliderButton.Size = UDim2.new(0, 20, 1, 0)
+        sliderButton.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+        sliderButton.Parent = sliderFrame
+        
+        local buttonCorner = Instance.new("UICorner")
+        buttonCorner.CornerRadius = UDim.new(0, 10)
+        buttonCorner.Parent = sliderButton
+        
+        -- Funcionalidade do slider
+        local dragging = false
+        
+        local function updateSlider(input)
+            local relativeX = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
+            local value = min + (max - min) * relativeX
+            value = math.floor(value / step + 0.5) * step
             
-            local animation = hum.Animator:LoadAnimation(attackAnimations[combatState.Combo.Value])
-            animation:Play()
-            
-            animation:GetMarkerReachedSignal("Hit"):Connect(function(attackingBodyPart)
-                local bodyPart = char[attackingBodyPart]
-                local bodyPartBottom = bodyPart.CFrame - bodyPart.CFrame.UpVector * bodyPart.Size.Y/2
-                
-                -- AQUI É ONDE MODIFICAMOS A DETECÇÃO DE HIT
-                local baseRange = ReplicatedStorage.CombatConfiguration.Attacking.Ranges[tostring(combatState.Combo.Value)].Value
-                local enhancedRange = baseRange * config.rangeMultiplier + config.hitboxRadius
-                
-                -- Usar nossa detecção aprimorada
-                local hitTargets = findNearbyEnemies(char, enhancedRange)
-                
-                if #hitTargets > 0 then
-                    -- Processar até 3 alvos
-                    for i = 1, math.min(3, #hitTargets) do
-                        local target = hitTargets[i]
-                        local hitChar = target.character
-                        
-                        local bypassBlock = false -- Pode modificar isso se quiser
-                        local knockbackDirection = -bodyPart.CFrame.UpVector
-                        
-                        -- Criar efeito
-                        task.spawn(function()
-                            local comboParticleFolder = ReplicatedStorage.CombatConfiguration.ParticleEffects.Combos[tostring(combatState.Combo.Value)]
-                            local comboParticle = comboParticleFolder.ParticleContainer:Clone()
-                            
-                            comboParticle.CFrame = CFrame.new(bodyPartBottom.Position, -bodyPart.CFrame.UpVector * 1000)
-                            comboParticle.Parent = workspace["EFFECTS CONTAINER"]
-                            
-                            local comboSound = ReplicatedStorage.CombatConfiguration.SoundEffects.Combos[tostring(combatState.Combo.Value)]:Clone()
-                            comboSound.Parent = comboParticle
-                            comboSound:Play()
-                            
-                            task.wait(comboParticleFolder.DisableAfter.Value)
-                            
-                            for _, d in pairs(comboParticle:GetDescendants()) do
-                                if d:IsA("ParticleEmitter") or d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight") then
-                                    d.Enabled = false
-                                end
-                            end
-                        end)
-                        
-                        -- Aplicar dano
-                        game.ServerStorage.Events.DealDamage:Fire(char, hitChar, bypassBlock, knockbackDirection)
-                    end
-                else
-                    -- Se não acertar nada, usar detecção original como fallback
-                    local rp = RaycastParams.new()
-                    rp.FilterType = Enum.RaycastFilterType.Exclude
-                    rp.FilterDescendantsInstances = {char, workspace["EFFECTS CONTAINER"]}
-                    
-                    local hitRay = workspace:Blockcast(root.CFrame, Vector3.new(config.hitboxSize, config.hitboxSize, config.hitboxSize), 
-                                                     root.CFrame.LookVector * enhancedRange, rp)
-                    
-                    if hitRay then
-                        local hitChar = hitRay.Instance.Parent:FindFirstChild("Humanoid") and hitRay.Instance.Parent or 
-                                       hitRay.Instance.Parent.Parent:FindFirstChild("Humanoid") and hitRay.Instance.Parent.Parent
-                        
-                        if hitChar and hitChar.Humanoid.Health > 0 then
-                            local bypassBlock = hitRay.Normal == Enum.NormalId.Back
-                            local knockbackDirection = -bodyPart.CFrame.UpVector
-                            
-                            -- Efeito e dano
-                            task.spawn(function()
-                                local comboParticleFolder = ReplicatedStorage.CombatConfiguration.ParticleEffects.Combos[tostring(combatState.Combo.Value)]
-                                local comboParticle = comboParticleFolder.ParticleContainer:Clone()
-                                
-                                comboParticle.CFrame = CFrame.new(bodyPartBottom.Position, -bodyPart.CFrame.UpVector * 1000)
-                                comboParticle.Parent = workspace["EFFECTS CONTAINER"]
-                                
-                                local comboSound = ReplicatedStorage.CombatConfiguration.SoundEffects.Combos[tostring(combatState.Combo.Value)]:Clone()
-                                comboSound.Parent = comboParticle
-                                comboSound:Play()
-                                
-                                task.wait(comboParticleFolder.DisableAfter.Value)
-                                
-                                for _, d in pairs(comboParticle:GetDescendants()) do
-                                    if d:IsA("ParticleEmitter") or d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight") then
-                                        d.Enabled = false
-                                    end
-                                end
-                            end)
-                            
-                            game.ServerStorage.Events.DealDamage:Fire(char, hitChar, bypassBlock, knockbackDirection)
-                        end
-                    elseif ReplicatedStorage.CombatConfiguration.Combo.CanComboWithoutHitting.Value == false then
-                        combatState.LastAttacked.Value = 0
-                    end
-                end
-            end)
-            
-            animation.Stopped:Connect(function()
-                animation:Destroy()
-            end)
-            
-            while animation.IsPlaying do
-                if combatState.Attacking.Value == false then
-                    animation:Stop()
-                    combatState.LastAttacked.Value = 0
-                    break
-                end
-                RunService.Heartbeat:Wait()
+            DetectionConfig[configKey] = value
+            label.Text = name .. ": " .. value
+            sliderButton.Position = UDim2.new(relativeX, -10, 0, 0)
+        end
+        
+        sliderFrame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                updateSlider(input)
             end
         end)
         
-        task.wait(ReplicatedStorage.CombatConfiguration.Attacking.Cooldowns[tostring(combatState.Combo.Value)].Value)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                updateSlider(input)
+            end
+        end)
         
-        if combatState.Attacking.Value == true then
-            combatState.Attacking.Value = false
-        end
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
         
-        combatState.AttackCooldown.Value = false
+        -- Posição inicial do slider
+        local initialPos = (DetectionConfig[configKey] - min) / (max - min)
+        sliderButton.Position = UDim2.new(initialPos, -10, 0, 0)
+    end
+    
+    -- Criar sliders
+    createSlider("Largura", "Width", 2, 20, 1)
+    createSlider("Altura", "Height", 2, 15, 1)
+    createSlider("Profundidade", "Depth", 2, 25, 1)
+    createSlider("Alcance Máximo", "MaxRange", 5, 50, 1)
+    createSlider("Cooldown", "AttackCooldown", 0.1, 2.0, 0.1)
+    
+    -- Toggle para mostrar hitbox
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = UDim2.new(1, 0, 0, 50)
+    toggleFrame.BackgroundTransparency = 1
+    toggleFrame.Parent = scrollFrame
+    
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(1, 0, 1, 0)
+    toggleButton.BackgroundColor3 = DetectionConfig.ShowHitbox and Color3.fromRGB(0, 162, 255) or Color3.fromRGB(100, 100, 100)
+    toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleButton.TextScaled = true
+    toggleButton.Font = Enum.Font.SourceSansBold
+    toggleButton.Text = "👁️ Mostrar Hitbox: " .. (DetectionConfig.ShowHitbox and "ON" or "OFF")
+    toggleButton.Parent = toggleFrame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.Parent = toggleButton
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        DetectionConfig.ShowHitbox = not DetectionConfig.ShowHitbox
+        toggleButton.BackgroundColor3 = DetectionConfig.ShowHitbox and Color3.fromRGB(0, 162, 255) or Color3.fromRGB(100, 100, 100)
+        toggleButton.Text = "👁️ Mostrar Hitbox: " .. (DetectionConfig.ShowHitbox and "ON" or "OFF")
     end)
     
-    print("Sistema de combate modificado com sucesso!")
+    -- Botão fechar
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -35, 0, 5)
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.TextScaled = true
+    closeButton.Font = Enum.Font.SourceSansBold
+    closeButton.Text = "✕"
+    closeButton.Parent = mainFrame
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 15)
+    closeCorner.Parent = closeButton
+    
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        isMenuOpen = false
+        menuGui = nil
+    end)
+    
+    -- Atualiza tamanho do scroll
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+    end)
+    
+    menuGui = screenGui
+    isMenuOpen = true
 end
 
-function unhookCombatSystem()
-    if originalDoAttack then
-        originalDoAttack:Disconnect()
-        originalDoAttack = nil
-    end
-    print("Sistema de combate restaurado ao original")
-end
-
--- Toggle GUI com H
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.H then
-        if screenGui then
-            screenGui.Enabled = not screenGui.Enabled
+-- Configuração de controles
+local function setupControls()
+    -- Ataque com clique esquerdo
+    mouse.Button1Down:Connect(function()
+        if not isMenuOpen then
+            performAttack()
         end
-    end
-end)
-
--- Inicializar quando spawnar
-local function onCharacterAdded()
-    wait(2)
-    updateHitboxVisual()
-    startHitboxUpdate()
+    end)
+    
+    -- Menu com F (ou outra tecla de sua escolha)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == Enum.KeyCode.F then
+            if isMenuOpen then
+                if menuGui then
+                    menuGui:Destroy()
+                    menuGui = nil
+                end
+                isMenuOpen = false
+            else
+                createConfigMenu()
+            end
+        end
+    end)
 end
 
-player.CharacterAdded:Connect(onCharacterAdded)
-if player.Character then
-    onCharacterAdded()
-end
+-- Inicialização
+print("🚀 Sistema de Detecção de Combate Carregado!")
+print("📋 Controles:")
+print("   • Clique Esquerdo: Atacar")
+print("   • F: Abrir/Fechar Menu de Configurações")
+print("💡 Use o menu para ajustar precisão da detecção!")
 
--- Criar GUI
-createGUI()
+setupControls()
 
-print("Enhanced Hitbox V2 carregado! Pressione H para abrir o menu.")
-print("Ative o sistema e ajuste as configurações para melhorar sua hitbox!")
+-- Interface para outros scripts
+return {
+    Config = DetectionConfig,
+    PerformAttack = performAttack,
+    DetectTargets = detectTargetsInRegion,
+    OpenMenu = createConfigMenu
+}
