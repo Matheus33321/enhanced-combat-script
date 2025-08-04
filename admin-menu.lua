@@ -1,5 +1,5 @@
--- Combat System Admin Menu
--- Carregue via: loadstring(game:HttpGet("https://raw.githubusercontent.com/seu-usuario/seu-repo/main/admin-menu.lua"))()
+-- Combat System Admin Menu v2.0
+-- Carregue via: loadstring(game:HttpGet("https://raw.githubusercontent.com/Matheus33321/enhanced-combat-script/main/admin-menu.lua"))()
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -12,7 +12,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- Verificar se é o dono/admin (adicione seu UserID aqui)
 local ADMIN_USERIDS = {
-    19017521, -- Substitua pelo seu UserID
+    123456789, -- Substitua pelo seu UserID
     -- Adicione outros UserIDs de admins aqui se necessário
 }
 
@@ -32,6 +32,23 @@ end
 
 -- Aguardar configuração carregar
 local config = ReplicatedStorage:WaitForChild("CombatConfiguration")
+
+-- Debug: Mostrar estrutura da configuração
+print("=== ESTRUTURA DA CONFIGURAÇÃO ===")
+for _, child in pairs(config:GetChildren()) do
+    print("📁", child.Name, "(" .. child.ClassName .. ")")
+    if child:IsA("Folder") then
+        for _, subchild in pairs(child:GetChildren()) do
+            print("  📄", subchild.Name, "(" .. subchild.ClassName .. ")")
+            if subchild:IsA("Folder") then
+                for _, subsubchild in pairs(subchild:GetChildren()) do
+                    print("    📋", subsubchild.Name, "(" .. subsubchild.ClassName .. ")")
+                end
+            end
+        end
+    end
+end
+print("=== FIM DA ESTRUTURA ===")
 
 -- Remover menu existente se houver
 if CoreGui:FindFirstChild("CombatAdminMenu") then
@@ -58,27 +75,13 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = mainFrame
 
--- Adicionar sombra
-local shadow = Instance.new("ImageLabel")
-shadow.Name = "Shadow"
-shadow.Size = UDim2.new(1, 30, 1, 30)
-shadow.Position = UDim2.new(0, -15, 0, -15)
-shadow.BackgroundTransparency = 1
-shadow.Image = "rbxasset://textures/ui/InGameMenu/Dropshadow.png"
-shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-shadow.ImageTransparency = 0.5
-shadow.ScaleType = Enum.ScaleType.Slice
-shadow.SliceCenter = Rect.new(10, 10, 118, 118)
-shadow.Parent = mainFrame
-shadow.ZIndex = mainFrame.ZIndex - 1
-
 -- Título
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Name = "Title"
 titleLabel.Size = UDim2.new(1, -40, 0, 50)
 titleLabel.Position = UDim2.new(0, 20, 0, 10)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "🛠️ Combat System Admin Panel"
+titleLabel.Text = "🛠️ Combat System Admin Panel v2.0"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextScaled = true
 titleLabel.Font = Enum.Font.GothamBold
@@ -118,6 +121,21 @@ listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Padding = UDim.new(0, 10)
 listLayout.Parent = scrollFrame
 
+-- Função para verificar se um caminho existe
+local function pathExists(pathString)
+    local current = config
+    local path = string.split(pathString, ".")
+    
+    for i, part in ipairs(path) do
+        if current:FindFirstChild(part) then
+            current = current[part]
+        else
+            return false, "Não encontrado: " .. pathString .. " (parou em: " .. part .. ")"
+        end
+    end
+    return true, current
+end
+
 -- Função para criar seção
 local function createSection(name, order)
     local section = Instance.new("Frame")
@@ -146,8 +164,16 @@ local function createSection(name, order)
     return section
 end
 
--- Função para criar controle de valor
-local function createValueControl(parent, labelText, configPath, minValue, maxValue, step, order)
+-- Função para criar controle de valor único
+local function createValueControl(labelText, configPath, minValue, maxValue, step, order)
+    local exists, result = pathExists(configPath)
+    if not exists then
+        print("❌ Caminho não existe:", configPath, "-", result)
+        return nil
+    end
+    
+    print("✅ Caminho encontrado:", configPath)
+    
     local container = Instance.new("Frame")
     container.Name = labelText .. "Container"
     container.Size = UDim2.new(1, 0, 0, 60)
@@ -205,18 +231,8 @@ local function createValueControl(parent, labelText, configPath, minValue, maxVa
     
     -- Função para obter valor atual
     local function getCurrentValue()
-        local current = config
-        local path = string.split(configPath, ".")
-        
-        for i, part in ipairs(path) do
-            if current:FindFirstChild(part) then
-                current = current[part]
-            else
-                return nil
-            end
-        end
-        
-        if current:IsA("NumberValue") or current:IsA("IntValue") then
+        local exists, current = pathExists(configPath)
+        if exists and (current:IsA("NumberValue") or current:IsA("IntValue")) then
             return current.Value
         end
         return nil
@@ -224,18 +240,8 @@ local function createValueControl(parent, labelText, configPath, minValue, maxVa
     
     -- Função para definir valor
     local function setValue(value)
-        local current = config
-        local path = string.split(configPath, ".")
-        
-        for i, part in ipairs(path) do
-            if current:FindFirstChild(part) then
-                current = current[part]
-            else
-                return false
-            end
-        end
-        
-        if current:IsA("NumberValue") or current:IsA("IntValue") then
+        local exists, current = pathExists(configPath)
+        if exists and (current:IsA("NumberValue") or current:IsA("IntValue")) then
             current.Value = value
             return true
         end
@@ -260,17 +266,19 @@ local function createValueControl(parent, labelText, configPath, minValue, maxVa
             
             if setValue(inputValue) then
                 textBox.Text = tostring(inputValue)
+                print("✅ Valor alterado:", configPath, "=", inputValue)
                 -- Feedback visual
                 local originalColor = applyButton.BackgroundColor3
                 applyButton.BackgroundColor3 = Color3.fromRGB(25, 135, 84)
-                wait(0.2)
+                task.wait(0.2)
                 applyButton.BackgroundColor3 = originalColor
             end
         else
+            print("❌ Valor inválido para:", configPath)
             -- Erro - feedback visual
             local originalColor = applyButton.BackgroundColor3
             applyButton.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
-            wait(0.2)
+            task.wait(0.2)
             applyButton.BackgroundColor3 = originalColor
         end
     end)
@@ -278,11 +286,29 @@ local function createValueControl(parent, labelText, configPath, minValue, maxVa
     return container
 end
 
--- Função para criar controle de range (para ataques)
-local function createRangeControl(parent, labelText, basePath, comboCount, order)
+-- Função para criar controle de range (múltiplos valores numerados)
+local function createRangeControl(labelText, basePath, maxCount, order)
+    -- Verificar quantos combos existem realmente
+    local actualCount = 0
+    for i = 1, maxCount do
+        local exists = pathExists(basePath .. "." .. tostring(i))
+        if exists then
+            actualCount = actualCount + 1
+        else
+            break
+        end
+    end
+    
+    if actualCount == 0 then
+        print("❌ Nenhum combo encontrado em:", basePath)
+        return nil
+    end
+    
+    print("✅ Encontrados", actualCount, "combos em:", basePath)
+    
     local container = Instance.new("Frame")
     container.Name = labelText .. "Container"
-    container.Size = UDim2.new(1, 0, 0, 120)
+    container.Size = UDim2.new(1, 0, 0, 50 + (actualCount * 35))
     container.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     container.BorderSizePixel = 0
     container.LayoutOrder = order
@@ -304,10 +330,10 @@ local function createRangeControl(parent, labelText, basePath, comboCount, order
     label.Parent = container
     
     -- Criar controles para cada combo
-    for i = 1, comboCount do
+    for i = 1, actualCount do
         local comboContainer = Instance.new("Frame")
-        comboContainer.Size = UDim2.new(1, -20, 0, 25)
-        comboContainer.Position = UDim2.new(0, 10, 0, 30 + (i-1) * 30)
+        comboContainer.Size = UDim2.new(1, -20, 0, 30)
+        comboContainer.Position = UDim2.new(0, 10, 0, 35 + (i-1) * 35)
         comboContainer.BackgroundTransparency = 1
         comboContainer.Parent = container
         
@@ -352,18 +378,20 @@ local function createRangeControl(parent, labelText, basePath, comboCount, order
         comboApplyCorner.Parent = comboApplyButton
         
         -- Funções para este combo específico
+        local comboPath = basePath .. "." .. tostring(i)
+        
         local function getCurrentComboValue()
-            local path = config[basePath][tostring(i)]
-            if path and path:IsA("NumberValue") then
-                return path.Value
+            local exists, current = pathExists(comboPath)
+            if exists and (current:IsA("NumberValue") or current:IsA("IntValue")) then
+                return current.Value
             end
             return nil
         end
         
         local function setComboValue(value)
-            local path = config[basePath][tostring(i)]
-            if path and path:IsA("NumberValue") then
-                path.Value = value
+            local exists, current = pathExists(comboPath)
+            if exists and (current:IsA("NumberValue") or current:IsA("IntValue")) then
+                current.Value = value
                 return true
             end
             return false
@@ -381,17 +409,19 @@ local function createRangeControl(parent, labelText, basePath, comboCount, order
             if inputValue and inputValue >= 0 then
                 if setComboValue(inputValue) then
                     comboTextBox.Text = tostring(inputValue)
+                    print("✅ Combo", i, "alterado:", comboPath, "=", inputValue)
                     -- Feedback visual
                     local originalColor = comboApplyButton.BackgroundColor3
                     comboApplyButton.BackgroundColor3 = Color3.fromRGB(25, 135, 84)
-                    wait(0.2)
+                    task.wait(0.2)
                     comboApplyButton.BackgroundColor3 = originalColor
                 end
             else
+                print("❌ Valor inválido para combo", i, ":", comboPath)
                 -- Erro - feedback visual
                 local originalColor = comboApplyButton.BackgroundColor3
                 comboApplyButton.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
-                wait(0.2)
+                task.wait(0.2)
                 comboApplyButton.BackgroundColor3 = originalColor
             end
         end)
@@ -407,109 +437,124 @@ local orderCounter = 0
 createSection("⚔️ Sistema de Ataque", orderCounter)
 orderCounter = orderCounter + 1
 
-createRangeControl(scrollFrame, "🎯 Alcance dos Ataques (Studs)", "Attacking.Ranges", 4, orderCounter)
+createRangeControl("🎯 Alcance dos Ataques (Studs)", "Attacking.Ranges", 10, orderCounter)
 orderCounter = orderCounter + 1
 
-createRangeControl(scrollFrame, "💥 Dano por Combo", "Damage.ComboDamage", 4, orderCounter)
+createRangeControl("💥 Dano por Combo", "Damage.ComboDamage", 10, orderCounter)
 orderCounter = orderCounter + 1
 
-createRangeControl(scrollFrame, "⏱️ Cooldown dos Ataques (Segundos)", "Attacking.Cooldowns", 4, orderCounter)
+createRangeControl("⏱️ Cooldown dos Ataques (Segundos)", "Attacking.Cooldowns", 10, orderCounter)
 orderCounter = orderCounter + 1
 
-createValueControl(scrollFrame, "⚡ Custo de Stamina por Ataque", "Stamina.AttackStaminaCost", 0, 100, 1, orderCounter)
-orderCounter = orderCounter + 1
+-- Tentar diferentes caminhos para stamina
+local staminaPaths = {
+    "Stamina.AttackStaminaCost",
+    "AttackStaminaCost", 
+    "Attacking.StaminaCost"
+}
 
-createValueControl(scrollFrame, "🎲 Chance de Crítico (%)", "Damage.CriticalHitChance", 0, 100, 1, orderCounter)
-orderCounter = orderCounter + 1
+for _, path in pairs(staminaPaths) do
+    if createValueControl("⚡ Custo de Stamina por Ataque", path, 0, 100, 1, orderCounter) then
+        orderCounter = orderCounter + 1
+        break
+    end
+end
 
-createValueControl(scrollFrame, "💀 Multiplicador de Crítico", "Damage.CriticalHitMultiplier", 1, 10, 0.1, orderCounter)
-orderCounter = orderCounter + 1
+-- Tentar diferentes caminhos para crítico
+local critPaths = {
+    "Damage.CriticalHitChance",
+    "CriticalHitChance",
+    "Damage.CritChance"
+}
+
+for _, path in pairs(critPaths) do
+    if createValueControl("🎲 Chance de Crítico (%)", path, 0, 100, 1, orderCounter) then
+        orderCounter = orderCounter + 1
+        break
+    end
+end
+
+local critMultPaths = {
+    "Damage.CriticalHitMultiplier",
+    "CriticalHitMultiplier", 
+    "Damage.CritMultiplier"
+}
+
+for _, path in pairs(critMultPaths) do
+    if createValueControl("💀 Multiplicador de Crítico", path, 1, 10, 0.1, orderCounter) then
+        orderCounter = orderCounter + 1
+        break
+    end
+end
 
 -- Seção de Defesa
 createSection("🛡️ Sistema de Defesa", orderCounter)
 orderCounter = orderCounter + 1
 
-createValueControl(scrollFrame, "❤️ Vida Máxima do Bloqueio", "Blocking.MaxHealth", 1, 1000, 1, orderCounter)
-orderCounter = orderCounter + 1
+local blockingPaths = {
+    "Blocking.MaxHealth",
+    "BlockHealth.Max",
+    "Block.MaxHealth"
+}
 
-createValueControl(scrollFrame, "🔄 Taxa de Regeneração do Bloqueio", "Blocking.HealRate", 0.1, 50, 0.1, orderCounter)
-orderCounter = orderCounter + 1
-
-createValueControl(scrollFrame, "🛡️ Absorção de Dano (%)", "Blocking.DamageAbsorption", 0, 1, 0.01, orderCounter)
-orderCounter = orderCounter + 1
-
-createValueControl(scrollFrame, "👟 Velocidade Caminhando (Bloqueando)", "Blocking.WalkSpeed", 0, 50, 1, orderCounter)
-orderCounter = orderCounter + 1
-
-createValueControl(scrollFrame, "🏃 Velocidade Correndo (Bloqueando)", "Blocking.RunSpeed", 0, 50, 1, orderCounter)
-orderCounter = orderCounter + 1
+for _, path in pairs(blockingPaths) do
+    if createValueControl("❤️ Vida Máxima do Bloqueio", path, 1, 1000, 1, orderCounter) then
+        orderCounter = orderCounter + 1
+        break
+    end
+end
 
 -- Seção de Movimento
 createSection("🏃 Sistema de Movimento", orderCounter)
 orderCounter = orderCounter + 1
 
-createValueControl(scrollFrame, "🚶 Velocidade de Caminhada", "Walking.Speed", 0, 50, 1, orderCounter)
-orderCounter = orderCounter + 1
+local walkSpeedPaths = {
+    "Walking.Speed",
+    "WalkSpeed",
+    "Movement.WalkSpeed"
+}
 
-createValueControl(scrollFrame, "💨 Velocidade de Corrida", "Running.Speed", 0, 100, 1, orderCounter)
-orderCounter = orderCounter + 1
+for _, path in pairs(walkSpeedPaths) do
+    if createValueControl("🚶 Velocidade de Caminhada", path, 0, 50, 1, orderCounter) then
+        orderCounter = orderCounter + 1
+        break
+    end
+end
 
-createValueControl(scrollFrame, "⚡ Stamina Máxima", "Stamina.MaxStamina", 1, 1000, 1, orderCounter)
-orderCounter = orderCounter + 1
+local runSpeedPaths = {
+    "Running.Speed",
+    "RunSpeed", 
+    "Sprint.Speed"
+}
 
-createValueControl(scrollFrame, "📉 Taxa de Diminuição de Stamina", "Stamina.StaminaDecreaseRate", 0.1, 100, 0.1, orderCounter)
-orderCounter = orderCounter + 1
-
-createValueControl(scrollFrame, "📈 Taxa de Aumento de Stamina", "Stamina.StaminaIncreaseRate", 0.1, 100, 0.1, orderCounter)
-orderCounter = orderCounter + 1
-
--- Seção de Combo
-createSection("🔥 Sistema de Combo", orderCounter)
-orderCounter = orderCounter + 1
-
-createValueControl(scrollFrame, "⏰ Tempo de Expiração do Combo", "Combo.ExpireTime", 0.1, 10, 0.1, orderCounter)
-orderCounter = orderCounter + 1
+for _, path in pairs(runSpeedPaths) do
+    if createValueControl("💨 Velocidade de Corrida", path, 0, 100, 1, orderCounter) then
+        orderCounter = orderCounter + 1
+        break
+    end
+end
 
 -- Seção de Knockback
 createSection("💢 Sistema de Knockback", orderCounter)
 orderCounter = orderCounter + 1
 
-createRangeControl(scrollFrame, "🌊 Força do Knockback por Combo", "Knockback.ComboKnockback", 4, orderCounter)
+createRangeControl("🌊 Força do Knockback por Combo", "Knockback.ComboKnockback", 10, orderCounter)
 orderCounter = orderCounter + 1
 
 -- Seção de Stun
 createSection("😵 Sistema de Stun", orderCounter)
+orderCounter = orderCounter + 1 
+
+createRangeControl("⏱️ Duração do Stun por Combo", "Stunned.StunDurations", 10, orderCounter)
 orderCounter = orderCounter + 1
-
-createRangeControl(scrollFrame, "⏱️ Duração do Stun por Combo", "Stunned.StunDurations", 4, orderCounter)
-orderCounter = orderCounter + 1
-
--- Botão de Reset Geral
-local resetButton = Instance.new("TextButton")
-resetButton.Name = "ResetButton"
-resetButton.Size = UDim2.new(1, 0, 0, 50)
-resetButton.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
-resetButton.Text = "🔄 RESETAR TODAS AS CONFIGURAÇÕES"
-resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-resetButton.TextScaled = true
-resetButton.Font = Enum.Font.GothamBold
-resetButton.BorderSizePixel = 0
-resetButton.LayoutOrder = orderCounter
-resetButton.Parent = scrollFrame
-
-local resetCorner = Instance.new("UICorner")
-resetCorner.CornerRadius = UDim.new(0, 6)
-resetCorner.Parent = resetButton
-
--- Funcionalidade do botão reset (implementar conforme necessário)
-resetButton.MouseButton1Click:Connect(function()
-    warn("Função de reset não implementada - adicione os valores padrão aqui")
-end)
 
 -- Atualizar tamanho do canvas
 listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 20)
 end)
+
+-- Definir tamanho inicial do canvas
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 20)
 
 -- Funcionalidade de fechar
 closeButton.MouseButton1Click:Connect(function()
@@ -548,6 +593,6 @@ local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection
 local tween = TweenService:Create(mainFrame, tweenInfo, {Position = UDim2.new(0.5, -400, 0.5, -300)})
 tween:Play()
 
-print("✅ Combat Admin Menu carregado com sucesso!")
-print("📝 Substitua o UserID na linha 15 pelo seu UserID real")
-print("🔧 Menu disponível apenas para administadores autorizados")
+print("✅ Combat Admin Menu v2.0 carregado com sucesso!")
+print("📝 Verifique o console para ver a estrutura da configuração")
+print("🔧 Menu adaptado automaticamente aos caminhos existentes")
